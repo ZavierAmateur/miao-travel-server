@@ -34,10 +34,10 @@ CloudBase CLI 的 `cloudrun detail --json` 会在 `ServerConfig.EnvParams` 中�
 
 ## 尚未完成
 
-1. 将默认 HTTPS 域名加入微信小游戏 request 合法域名。
+1. 使用前端 `wx.cloud.callContainer` 完成云托管环境关联和真实调用验收；默认公网域名不能配置为 request 合法域名。
 2. 使用新鲜 `wx.login` code 完成 `code2Session -> players -> sessions` 全链路。
 3. 验证同一微信账号第二次登录复用 playerId 且 `isNew=false`。
-4. 同步前端生产 `baseUrl`，完成开发者工具及真机游客降级验收。
+4. 完成开发者工具及真机游客降级验收；公网默认域名仅保留运维测试用途。
 
 ## 结论
 
