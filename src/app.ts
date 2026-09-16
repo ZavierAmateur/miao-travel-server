@@ -1,9 +1,12 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import type { AppConfig } from "./config/AppConfig.js";
 import { success } from "./contracts/ApiResponse.js";
+import type { PlatformLoginService } from "./domain/auth/PlatformLoginService.js";
+import { PlatformAuthError } from "./platform/PlatformAuthError.js";
 
 export interface BuildAppOptions {
   readonly config: AppConfig;
+  readonly platformLoginService?: PlatformLoginService;
   readonly now?: () => number;
 }
 
@@ -42,6 +45,30 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     }, now());
   });
 
+  if (options.platformLoginService) {
+    app.post<{
+      Body: { code?: string; anonymousCode?: string; clientVersion: string };
+    }>("/v1/auth/platform-login", {
+      schema: {
+        body: {
+          type: "object",
+          additionalProperties: false,
+          required: ["clientVersion"],
+          properties: {
+            code: { type: "string", minLength: 1, maxLength: 512 },
+            anonymousCode: { type: "string", minLength: 1, maxLength: 512 },
+            clientVersion: { type: "string", minLength: 1, maxLength: 64 },
+          },
+          anyOf: [{ required: ["code"] }, { required: ["anonymousCode"] }],
+        },
+      },
+    }, async (request, reply) => {
+      reply.header("cache-control", "no-store");
+      const result = await options.platformLoginService!.login(request.body);
+      return success(request.id, result, now());
+    });
+  }
+
   app.setNotFoundHandler(async (request, reply) => {
     await reply.code(404).send({
       code: "ROUTE_NOT_FOUND",
@@ -52,6 +79,25 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   });
 
   app.setErrorHandler(async (error, request, reply) => {
+    if (typeof error === "object" && error !== null && "validation" in error) {
+      await reply.code(400).send({
+        code: "INVALID_REQUEST",
+        msg: "请求参数无效",
+        timestamp: now(),
+        requestId: request.id,
+      });
+      return;
+    }
+    if (error instanceof PlatformAuthError) {
+      request.log.warn({ platformErrorCode: error.platformErrorCode }, error.message);
+      await reply.code(error.code === "PLATFORM_AUTH_UNAVAILABLE" ? 503 : 401).send({
+        code: error.code,
+        msg: error.message,
+        timestamp: now(),
+        requestId: request.id,
+      });
+      return;
+    }
     request.log.error({ err: error }, "请求处理失败");
     await reply.code(500).send({
       code: "INTERNAL_ERROR",

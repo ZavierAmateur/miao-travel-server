@@ -23,6 +23,8 @@ export interface AppConfig {
   readonly logLevel: "debug" | "info" | "warn" | "error";
 }
 
+export type PersistenceDriver = "memory" | "cloud";
+
 export class ConfigValidationError extends Error {
   constructor(readonly issues: readonly string[]) {
     super(`环境配置无效：${issues.join("；")}`);
@@ -63,4 +65,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     appSecret,
     logLevel: logLevel as AppConfig["logLevel"],
   };
+}
+
+/** 防止把仅供开发的内存仓储误部署到生产环境。 */
+export function assertPersistenceReady(config: AppConfig, driver: PersistenceDriver): void {
+  if (config.environment === AppEnvironment.Production && driver === "memory") {
+    throw new ConfigValidationError(["生产环境禁止使用内存仓储，请先完成云数据库适配"]);
+  }
 }

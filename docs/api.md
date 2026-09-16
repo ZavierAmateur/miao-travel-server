@@ -46,3 +46,47 @@
   "platform": "wechat"
 }
 ```
+
+## `POST /v1/auth/platform-login`
+
+无需 Bearer token。当前部署的平台由服务端 `PLATFORM` 固定，客户端不能通过请求参数切换平台。
+
+微信请求：
+
+```json
+{
+  "code": "wx.login 返回的一次性 code",
+  "clientVersion": "3.4.2"
+}
+```
+
+抖音已登录请求使用 `code`；匿名登录可以使用 `anonymousCode`。两者至少提供一个。
+
+成功数据：
+
+```json
+{
+  "token": "自有会话 token",
+  "playerId": "服务端玩家 ID",
+  "isNew": true,
+  "isBanned": false,
+  "banReason": "",
+  "banExpire": 0,
+  "whiteList": false,
+  "data": "",
+  "saveRevision": 0,
+  "serverTime": 1789520000000
+}
+```
+
+安全约束：响应不返回平台 openid、unionid、session_key 或 AppSecret；服务端仅保存自有 token 的 SHA-256 哈希。
+
+错误码：
+
+| HTTP | code | 说明 |
+|---|---|---|
+| 400 | `INVALID_REQUEST` | 缺少 code/anonymousCode 或字段格式错误 |
+| 401 | `PLATFORM_CODE_INVALID` | 缺少可用平台凭证 |
+| 401 | `PLATFORM_AUTH_REJECTED` | 平台拒绝或 code 已失效 |
+| 401 | `PLATFORM_RESPONSE_INVALID` | 平台响应缺少必要身份字段 |
+| 503 | `PLATFORM_AUTH_UNAVAILABLE` | 平台认证服务超时或不可用 |
