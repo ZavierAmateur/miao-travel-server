@@ -1,6 +1,7 @@
 import type { Session } from "../../domain/session/Session.js";
 import type { SessionRepository } from "../../domain/session/SessionRepository.js";
 import type { CloudBaseCollectionReference } from "../persistence/CloudBaseDatabase.js";
+import { isMissingDocument } from "../persistence/CloudBaseErrors.js";
 
 export interface CloudBaseSessionDocument {
   readonly _id?: string;
@@ -23,15 +24,20 @@ export class CloudBaseSessionRepository implements SessionRepository {
   }
 
   async findByTokenHash(tokenHash: string): Promise<Session | undefined> {
-    const result = await this.collection.doc(tokenHash).get();
-    const document = result.data[0] as CloudBaseSessionDocument | undefined;
-    if (!document) return undefined;
-    return {
-      tokenHash,
-      playerId: document.playerId,
-      createdAt: document.createdAt,
-      expiresAt: document.expiresAt,
-      ...(document.revokedAt === undefined ? {} : { revokedAt: document.revokedAt }),
-    };
+    try {
+      const result = await this.collection.doc(tokenHash).get();
+      const document = result.data[0] as CloudBaseSessionDocument | undefined;
+      if (!document) return undefined;
+      return {
+        tokenHash,
+        playerId: document.playerId,
+        createdAt: document.createdAt,
+        expiresAt: document.expiresAt,
+        ...(document.revokedAt === undefined ? {} : { revokedAt: document.revokedAt }),
+      };
+    } catch (error) {
+      if (isMissingDocument(error)) return undefined;
+      throw error;
+    }
   }
 }

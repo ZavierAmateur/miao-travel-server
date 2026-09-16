@@ -15,6 +15,34 @@ function collectionWithDocument(document: Partial<CloudBaseDocumentReference>) {
 }
 
 describe("CloudBasePlayerRepository", () => {
+  it("首次登录读取不存在的玩家文档时返回未找到", async () => {
+    const get = vi.fn().mockRejectedValue({
+      code: "DOCUMENT_NOT_FOUND",
+      message: "Document not found",
+    });
+    const { collection } = collectionWithDocument({ get });
+    const repository = new CloudBasePlayerRepository(collection);
+
+    await expect(repository.findByPlatformIdentity({
+      platform: PlatformKind.WeChat,
+      appId: "wx-app",
+      openId: "new-user-open-id",
+    })).resolves.toBeUndefined();
+  });
+
+  it("查询玩家时不吞掉权限等未知数据库错误", async () => {
+    const error = { code: "PERMISSION_DENIED", message: "Permission denied" };
+    const get = vi.fn().mockRejectedValue(error);
+    const { collection } = collectionWithDocument({ get });
+    const repository = new CloudBasePlayerRepository(collection);
+
+    await expect(repository.findByPlatformIdentity({
+      platform: PlatformKind.WeChat,
+      appId: "wx-app",
+      openId: "private-open-id",
+    })).rejects.toBe(error);
+  });
+
   it("用身份哈希查询且不把明文 openid 写入数据库", async () => {
     const get = vi.fn().mockResolvedValue({
       requestId: "request-1",
@@ -65,6 +93,17 @@ describe("CloudBasePlayerRepository", () => {
 });
 
 describe("CloudBaseSessionRepository", () => {
+  it("读取不存在的会话文档时返回未找到", async () => {
+    const get = vi.fn().mockRejectedValue({
+      code: "DOCUMENT_NOT_FOUND",
+      message: "Document not found",
+    });
+    const { collection } = collectionWithDocument({ get });
+    const repository = new CloudBaseSessionRepository(collection);
+
+    await expect(repository.findByTokenHash("missing-token-hash")).resolves.toBeUndefined();
+  });
+
   it("仅以 token 哈希为文档主键", async () => {
     const set = vi.fn().mockResolvedValue({ requestId: "request-3" });
     const { collection, doc } = collectionWithDocument({ set });

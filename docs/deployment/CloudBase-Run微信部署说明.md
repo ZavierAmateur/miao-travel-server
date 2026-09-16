@@ -75,6 +75,8 @@ npx -y -p @cloudbase/cli@3.8.2 tcb cloudrun deploy \
 4. 同一微信账号连续登录两次，playerId 相同，第二次 `isNew=false`。
 5. CloudBase `players`、`sessions` 中不存在明文 openid、unionid、token、AppSecret 或 API Key。
 6. 验证服务缩容到 0 后可以冷启动；记录首次响应耗时，但登录失败仍允许前端游客降级。
+
+注意：CloudBase 按文档 ID 读取不存在记录时会抛出 `DOCUMENT_NOT_FOUND`。首次玩家登录和无效会话查询必须把该错误视为“未找到”；权限、网络、配额等错误不得按空记录吞掉。
 7. 验收完成后归档服务版本、后端 commit、前端 commit、默认域名、requestId 和测试结论，不归档 Secret。
 
 ## 6. CLI 诊断安全

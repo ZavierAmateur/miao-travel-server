@@ -3,6 +3,7 @@ import type { PlatformKind } from "../../config/AppConfig.js";
 import type { Player, PlayerStatus } from "../../domain/player/Player.js";
 import type { PlatformIdentity, PlayerRepository } from "../../domain/player/PlayerRepository.js";
 import type { CloudBaseCollectionReference } from "../persistence/CloudBaseDatabase.js";
+import { isMissingDocument } from "../persistence/CloudBaseErrors.js";
 import { hashOptionalIdentifier, hashPlatformIdentity } from "../persistence/IdentityHash.js";
 
 export interface CloudBasePlayerDocument {
@@ -20,9 +21,14 @@ export class CloudBasePlayerRepository implements PlayerRepository {
   constructor(private readonly collection: CloudBaseCollectionReference) {}
 
   async findByPlatformIdentity(identity: PlatformIdentity): Promise<Player | undefined> {
-    const result = await this.collection.doc(hashPlatformIdentity(identity)).get();
-    const document = result.data[0] as CloudBasePlayerDocument | undefined;
-    return document ? this.toPlayer(document, identity.openId, identity.unionId) : undefined;
+    try {
+      const result = await this.collection.doc(hashPlatformIdentity(identity)).get();
+      const document = result.data[0] as CloudBasePlayerDocument | undefined;
+      return document ? this.toPlayer(document, identity.openId, identity.unionId) : undefined;
+    } catch (error) {
+      if (isMissingDocument(error)) return undefined;
+      throw error;
+    }
   }
 
   async save(player: Player): Promise<Player> {
