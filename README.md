@@ -37,6 +37,10 @@ npm run db:check
 
 微信本地配置使用 `.env.wechat.local` 时可运行 `npm run db:check:wechat`。
 
+## CloudBase Run 部署
+
+仓库根目录已经提供生产用多阶段 `Dockerfile` 和 `.dockerignore`。微信首次云端部署的服务参数、环境变量与验收步骤见：`docs/deployment/CloudBase-Run微信部署说明.md`。
+
 ## 验证命令
 
 ```bash
