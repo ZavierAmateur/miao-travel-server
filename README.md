@@ -2,7 +2,7 @@
 
 喵的旅行日记微信小游戏、抖音小游戏轻量后端。
 
-当前阶段：P2 微信真实登录已验收；P3A 云存档后端、CloudBase 条件写、前端接入和新版本部署已完成，待在微信开发者工具完成真实玩家端到端存取验收。
+当前阶段：P2 微信真实登录和 P3A 云存档 MVP 已完成真实 CloudBase、部署服务与微信开发者工具端到端验收；下一阶段进入 P4 平台联调与故障演练。
 
 登录服务可通过 `PERSISTENCE_DRIVER=memory|cloudbase-http` 切换仓储。生产环境禁止使用内存仓储；CloudBase 模式通过官方 JS SDK 的 HTTP API 访问内置文档数据库。平台 openid、unionid 和自有 token 均不以明文写入数据库。
 
