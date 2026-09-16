@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { AppEnvironment, PersistenceDriver, PlatformKind, type AppConfig } from "../src/config/AppConfig.js";
 import { PlatformLoginService } from "../src/domain/auth/PlatformLoginService.js";
+import type { PlayerRepository } from "../src/domain/player/PlayerRepository.js";
 import { InMemoryPlayerRepository } from "../src/infrastructure/repositories/InMemoryPlayerRepository.js";
 import { InMemorySessionRepository } from "../src/infrastructure/repositories/InMemorySessionRepository.js";
 import type { PlatformAuthGateway } from "../src/platform/PlatformAuthGateway.js";
@@ -15,7 +16,10 @@ const config: AppConfig = {
   appSecret: "test-secret",
   logLevel: "error",
   persistenceDriver: PersistenceDriver.Memory,
-  cloudDatabaseUri: "",
+  cloudbaseEnvId: "",
+  cloudbaseRegion: "",
+  cloudbaseApiKey: "",
+  cloudbaseDatabaseInstance: "",
   cloudDatabaseName: "",
 };
 
@@ -52,5 +56,32 @@ describe("PlatformLoginService", () => {
       tokenHash,
     });
     await expect(sessions.findByTokenHash("token-1")).resolves.toBeUndefined();
+  });
+
+  it("仓储规范化 playerId 后仍把首次登录标记为新用户", async () => {
+    const players: PlayerRepository = {
+      findByPlatformIdentity: () => Promise.resolve(undefined),
+      save: (player) => Promise.resolve({ ...player, id: "canonical-player" }),
+    };
+    const gateway: PlatformAuthGateway = {
+      exchangeCode: () => Promise.resolve({
+        platform: PlatformKind.WeChat,
+        openId: "open-2",
+        sessionKey: "platform-secret-session",
+      }),
+    };
+    const service = new PlatformLoginService({
+      config,
+      gateway,
+      players,
+      sessions: new InMemorySessionRepository(),
+      createPlayerId: () => "candidate-player",
+      createToken: () => "token",
+    });
+
+    await expect(service.login({ code: "new-user-code" })).resolves.toMatchObject({
+      playerId: "canonical-player",
+      isNew: true,
+    });
   });
 });

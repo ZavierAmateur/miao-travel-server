@@ -15,7 +15,7 @@ export type PlatformKind = typeof PlatformKind[keyof typeof PlatformKind];
 
 export const PersistenceDriver = Object.freeze({
   Memory: "memory",
-  Mongo: "mongo",
+  CloudBaseHttp: "cloudbase-http",
 } as const);
 
 export type PersistenceDriver = typeof PersistenceDriver[keyof typeof PersistenceDriver];
@@ -29,7 +29,10 @@ export interface AppConfig {
   readonly appSecret: string;
   readonly logLevel: "debug" | "info" | "warn" | "error";
   readonly persistenceDriver: PersistenceDriver;
-  readonly cloudDatabaseUri: string;
+  readonly cloudbaseEnvId: string;
+  readonly cloudbaseRegion: string;
+  readonly cloudbaseApiKey: string;
+  readonly cloudbaseDatabaseInstance: string;
   readonly cloudDatabaseName: string;
 }
 
@@ -56,8 +59,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const appSecret = env.APP_SECRET?.trim() ?? "";
   const logLevel = env.LOG_LEVEL ?? "info";
   const persistenceDriver = env.PERSISTENCE_DRIVER ?? PersistenceDriver.Memory;
-  const cloudDatabaseUri = env.CLOUD_DATABASE_URI?.trim() ?? "";
-  const cloudDatabaseName = env.CLOUD_DATABASE_NAME?.trim() ?? "";
+  const cloudbaseEnvId = env.CLOUDBASE_ENV_ID?.trim() ?? "";
+  const cloudbaseRegion = env.CLOUDBASE_REGION?.trim() ?? "";
+  const cloudbaseApiKey = env.CLOUDBASE_API_KEY?.trim() ?? "";
+  const cloudbaseDatabaseInstance = env.CLOUDBASE_DATABASE_INSTANCE?.trim() ?? "";
+  const cloudDatabaseName = env.CLOUDBASE_DATABASE_NAME?.trim() ?? "";
 
   if (!environments.has(environment)) issues.push(`NODE_ENV 不支持：${environment}`);
   if (!Number.isInteger(port) || port < 1 || port > 65_535) issues.push(`PORT 必须是 1-65535 的整数：${rawPort}`);
@@ -66,11 +72,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   if (!persistenceDrivers.has(persistenceDriver)) issues.push(`PERSISTENCE_DRIVER 不支持：${persistenceDriver}`);
   if (environment === AppEnvironment.Production && !appId) issues.push("生产环境必须配置 APP_ID");
   if (environment === AppEnvironment.Production && !appSecret) issues.push("生产环境必须配置 APP_SECRET");
-  if (persistenceDriver === PersistenceDriver.Mongo && !cloudDatabaseUri) {
-    issues.push("Mongo 持久化必须配置 CLOUD_DATABASE_URI");
-  }
-  if (persistenceDriver === PersistenceDriver.Mongo && !cloudDatabaseName) {
-    issues.push("Mongo 持久化必须配置 CLOUD_DATABASE_NAME");
+  if (persistenceDriver === PersistenceDriver.CloudBaseHttp) {
+    if (!cloudbaseEnvId) issues.push("CloudBase HTTP 持久化必须配置 CLOUDBASE_ENV_ID");
+    if (!cloudbaseRegion) issues.push("CloudBase HTTP 持久化必须配置 CLOUDBASE_REGION");
+    if (!cloudbaseApiKey) issues.push("CloudBase HTTP 持久化必须配置 CLOUDBASE_API_KEY");
+    if (!cloudbaseDatabaseInstance) issues.push("CloudBase HTTP 持久化必须配置 CLOUDBASE_DATABASE_INSTANCE");
+    if (!cloudDatabaseName) issues.push("CloudBase HTTP 持久化必须配置 CLOUDBASE_DATABASE_NAME");
   }
 
   if (issues.length > 0) throw new ConfigValidationError(issues);
@@ -84,7 +91,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     appSecret,
     logLevel: logLevel as AppConfig["logLevel"],
     persistenceDriver: persistenceDriver as PersistenceDriver,
-    cloudDatabaseUri,
+    cloudbaseEnvId,
+    cloudbaseRegion,
+    cloudbaseApiKey,
+    cloudbaseDatabaseInstance,
     cloudDatabaseName,
   };
 }

@@ -79,7 +79,7 @@ export class PlatformLoginService {
     return {
       token,
       playerId: storedPlayer.id,
-      isNew: !existing && storedPlayer.id === player.id,
+      isNew: !existing,
       isBanned: storedPlayer.status === PlayerStatus.Banned,
       banReason: "",
       banExpire: 0,

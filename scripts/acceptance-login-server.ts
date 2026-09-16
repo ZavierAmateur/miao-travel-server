@@ -14,7 +14,10 @@ const config: AppConfig = {
   appSecret: "acceptance-secret",
   logLevel: "error",
   persistenceDriver: PersistenceDriver.Memory,
-  cloudDatabaseUri: "",
+  cloudbaseEnvId: "",
+  cloudbaseRegion: "",
+  cloudbaseApiKey: "",
+  cloudbaseDatabaseInstance: "",
   cloudDatabaseName: "",
 };
 const gateway: PlatformAuthGateway = {

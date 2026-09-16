@@ -15,11 +15,12 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:check": "node --env-file-if-exists=.env --import tsx scripts/check-mongo-persistence.ts"
+    "db:check": "node --env-file-if-exists=.env --import tsx scripts/check-cloudbase-persistence.ts",
+    "db:check:wechat": "node --env-file=.env.wechat.local --import tsx scripts/check-cloudbase-persistence.ts"
   },
   "dependencies": {
-    "fastify": "^5.6.0",
-    "mongodb": "^7.6.0"
+    "@cloudbase/js-sdk": "^3.9.4",
+    "fastify": "^5.6.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",

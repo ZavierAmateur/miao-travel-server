@@ -1,11 +1,12 @@
-import { MongoClient } from "mongodb";
+import cloudbase from "@cloudbase/js-sdk";
 import { PersistenceDriver, type AppConfig } from "../../config/AppConfig.js";
 import type { PlayerRepository } from "../../domain/player/PlayerRepository.js";
 import type { SessionRepository } from "../../domain/session/SessionRepository.js";
 import { InMemoryPlayerRepository } from "../repositories/InMemoryPlayerRepository.js";
 import { InMemorySessionRepository } from "../repositories/InMemorySessionRepository.js";
-import { MongoPlayerRepository, type MongoPlayerDocument } from "../repositories/MongoPlayerRepository.js";
-import { MongoSessionRepository, type MongoSessionDocument } from "../repositories/MongoSessionRepository.js";
+import type { CloudBaseDatabase } from "./CloudBaseDatabase.js";
+import { CloudBasePlayerRepository } from "../repositories/CloudBasePlayerRepository.js";
+import { CloudBaseSessionRepository } from "../repositories/CloudBaseSessionRepository.js";
 
 export interface Persistence {
   readonly players: PlayerRepository;
@@ -13,41 +14,28 @@ export interface Persistence {
   close(): Promise<void>;
 }
 
-export async function createPersistence(config: AppConfig): Promise<Persistence> {
+export function createPersistence(config: AppConfig): Promise<Persistence> {
   if (config.persistenceDriver === PersistenceDriver.Memory) {
-    return {
+    return Promise.resolve({
       players: new InMemoryPlayerRepository(),
       sessions: new InMemorySessionRepository(),
       close: () => Promise.resolve(),
-    };
+    });
   }
 
-  const client = new MongoClient(config.cloudDatabaseUri, {
-    appName: "miao-travel-server",
-    minPoolSize: 0,
-    maxPoolSize: 5,
-    maxIdleTimeMS: 60_000,
-    serverSelectionTimeoutMS: 5_000,
+  const app = cloudbase.init({
+    env: config.cloudbaseEnvId,
+    region: config.cloudbaseRegion,
+    accessKey: config.cloudbaseApiKey,
+    timeout: 5_000,
   });
-  try {
-    await client.connect();
-    const database = client.db(config.cloudDatabaseName);
-    await database.command({ ping: 1 });
-    const players = database.collection<MongoPlayerDocument>("players");
-    const sessions = database.collection<MongoSessionDocument>("sessions");
-    await Promise.all([
-      players.createIndex({ id: 1 }, { unique: true, name: "uq_players_id" }),
-      players.createIndex({ platform: 1, status: 1, lastLoginAt: -1 }, { name: "ix_players_admin" }),
-      sessions.createIndex({ playerId: 1, expiresAt: -1 }, { name: "ix_sessions_player" }),
-      sessions.createIndex({ expiresAtDate: 1 }, { expireAfterSeconds: 0, name: "ttl_sessions_expiry" }),
-    ]);
-    return {
-      players: new MongoPlayerRepository(players),
-      sessions: new MongoSessionRepository(sessions),
-      close: () => client.close(),
-    };
-  } catch (error) {
-    await client.close();
-    throw error;
-  }
+  const database = app.database({
+    instance: config.cloudbaseDatabaseInstance,
+    database: config.cloudDatabaseName,
+  }) as CloudBaseDatabase;
+  return Promise.resolve({
+    players: new CloudBasePlayerRepository(database.collection("players")),
+    sessions: new CloudBaseSessionRepository(database.collection("sessions")),
+    close: () => Promise.resolve(),
+  });
 }

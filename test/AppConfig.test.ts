@@ -39,18 +39,22 @@ describe("loadConfig", () => {
       .toThrow(/生产环境禁止使用内存仓储/);
   });
 
-  it("拒绝 Mongo 持久化缺少连接配置", () => {
-    expect(() => loadConfig({ PERSISTENCE_DRIVER: "mongo" }))
-      .toThrow(/CLOUD_DATABASE_URI.*CLOUD_DATABASE_NAME/);
+  it("拒绝 CloudBase HTTP 持久化缺少连接配置", () => {
+    expect(() => loadConfig({ PERSISTENCE_DRIVER: "cloudbase-http" }))
+      .toThrow(/CLOUDBASE_ENV_ID.*CLOUDBASE_REGION.*CLOUDBASE_API_KEY.*CLOUDBASE_DATABASE_INSTANCE.*CLOUDBASE_DATABASE_NAME/);
   });
 
-  it("接受完整的 Mongo 持久化配置", () => {
+  it("接受完整的 CloudBase HTTP 持久化配置", () => {
     const config = loadConfig({
-      PERSISTENCE_DRIVER: "mongo",
-      CLOUD_DATABASE_URI: "mongodb://database.example.invalid:27017",
-      CLOUD_DATABASE_NAME: "miao_travel",
+      PERSISTENCE_DRIVER: "cloudbase-http",
+      CLOUDBASE_ENV_ID: "cloud1-example",
+      CLOUDBASE_REGION: "ap-shanghai",
+      CLOUDBASE_API_KEY: "server-api-key",
+      CLOUDBASE_DATABASE_INSTANCE: "(default)",
+      CLOUDBASE_DATABASE_NAME: "(default)",
     });
-    expect(config.persistenceDriver).toBe(PersistenceDriver.Mongo);
-    expect(config.cloudDatabaseName).toBe("miao_travel");
+    expect(config.persistenceDriver).toBe(PersistenceDriver.CloudBaseHttp);
+    expect(config.cloudbaseEnvId).toBe("cloud1-example");
+    expect(config.cloudDatabaseName).toBe("(default)");
   });
 });

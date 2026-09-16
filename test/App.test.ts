@@ -12,7 +12,10 @@ const config: AppConfig = {
   appSecret: "test-secret",
   logLevel: "error",
   persistenceDriver: PersistenceDriver.Memory,
-  cloudDatabaseUri: "",
+  cloudbaseEnvId: "",
+  cloudbaseRegion: "",
+  cloudbaseApiKey: "",
+  cloudbaseDatabaseInstance: "",
   cloudDatabaseName: "",
 };
 

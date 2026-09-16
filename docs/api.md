@@ -82,6 +82,8 @@
 
 安全约束：响应不返回平台 openid、unionid、session_key 或 AppSecret；服务端仅保存平台身份和自有 token 的 SHA-256 哈希。`persistence` 仅表示仓储驱动，不包含数据库地址或凭据。
 
+生产环境的 `persistence` 值为 `cloudbase-http`；CloudBase 环境 ID、API Key、实例和数据库名均不通过业务接口返回。
+
 错误码：
 
 | HTTP | code | 说明 |

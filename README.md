@@ -2,9 +2,9 @@
 
 喵的旅行日记微信小游戏、抖音小游戏轻量后端。
 
-当前阶段：P2B1 云持久化代码已实现，等待 CloudBase 环境 ID、MongoDB 外部连接串和真实 `wx.login` code 完成 P2B2 云端/真机验收。云存档在 P3 完成。
+当前阶段：P2B2 已完成 CloudBase 内置文档数据库 HTTP API 适配和真实读写连通验收；仍需真实 `wx.login` code、微信开发者工具和真机完成 P2 登录验收。云存档在 P3 完成。
 
-登录服务可通过 `PERSISTENCE_DRIVER=memory|mongo` 切换仓储。生产环境禁止使用内存仓储；Mongo 模式会在启动时连接数据库、执行 ping，并幂等确保玩家/会话索引。平台 openid、unionid 和自有 token 均不以明文写入数据库。
+登录服务可通过 `PERSISTENCE_DRIVER=memory|cloudbase-http` 切换仓储。生产环境禁止使用内存仓储；CloudBase 模式通过官方 JS SDK 的 HTTP API 访问内置文档数据库。平台 openid、unionid 和自有 token 均不以明文写入数据库。
 
 ## 本地运行
 
@@ -16,21 +16,26 @@ cp .env.example .env
 npm run dev
 ```
 
-开发环境允许 `APP_ID`、`APP_SECRET` 为空；生产环境缺少它们会拒绝启动。真实密钥和 `CLOUD_DATABASE_URI` 只能配置在本地 `.env` 或云端 Secret 中，不得提交到 Git。
+开发环境允许 `APP_ID`、`APP_SECRET` 为空；生产环境缺少它们会拒绝启动。真实密钥和 `CLOUDBASE_API_KEY` 只能配置在本地 `.env` 或云端 Secret 中，不得提交到 Git。
 
-腾讯 CloudBase 文档型数据库使用 MongoDB 官方驱动的外部连接能力。云环境配置：
+腾讯 CloudBase 内置文档数据库配置：
 
 ```bash
-PERSISTENCE_DRIVER=mongo
-CLOUD_DATABASE_URI=mongodb://控制台提供的私密连接串
-CLOUD_DATABASE_NAME=miao_travel
+PERSISTENCE_DRIVER=cloudbase-http
+CLOUDBASE_ENV_ID=控制台环境ID
+CLOUDBASE_REGION=ap-shanghai
+CLOUDBASE_API_KEY=服务端APIKey
+CLOUDBASE_DATABASE_INSTANCE=(default)
+CLOUDBASE_DATABASE_NAME=(default)
 ```
 
-验证数据库连通性和索引（不会输出连接串）：
+验证数据库集合和真实读写（探测记录会立即删除，且不会输出 API Key）：
 
 ```bash
 npm run db:check
 ```
+
+微信本地配置使用 `.env.wechat.local` 时可运行 `npm run db:check:wechat`。
 
 ## 验证命令
 
