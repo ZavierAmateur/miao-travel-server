@@ -1,6 +1,7 @@
 import { buildApp } from "./app.js";
 import { assertPersistenceReady, loadConfig } from "./config/AppConfig.js";
 import { PlatformLoginService } from "./domain/auth/PlatformLoginService.js";
+import { CloudSaveService } from "./domain/save/CloudSaveService.js";
 import { createPersistence } from "./infrastructure/persistence/createPersistence.js";
 import { createPlatformAuthGateway } from "./platform/createPlatformAuthGateway.js";
 
@@ -13,7 +14,11 @@ const platformLoginService = new PlatformLoginService({
   players: persistence.players,
   sessions: persistence.sessions,
 });
-const app = buildApp({ config, platformLoginService });
+const cloudSaveService = new CloudSaveService({
+  sessions: persistence.sessions,
+  saves: persistence.saves,
+});
+const app = buildApp({ config, platformLoginService, cloudSaveService });
 
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, "开始优雅关闭服务");

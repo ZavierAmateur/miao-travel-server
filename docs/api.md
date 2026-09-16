@@ -5,8 +5,8 @@
 - JSON 编码使用 UTF-8。
 - 时间戳统一为 UTC Unix 毫秒。
 - 客户端可传 `X-Request-Id`；服务端会校验长度并回显为 `requestId`。
-- 鉴权接口后续使用 `Authorization: Bearer <token>`。
-- 日志必须脱敏 authorization、平台 code、anonymousCode、token 和 sessionKey。
+- 鉴权接口使用 `Authorization: Bearer <token>`。
+- 日志必须脱敏 authorization、平台 code、anonymousCode、token、sessionKey、完整存档和幂等键。
 
 ## 成功响应
 
@@ -93,3 +93,87 @@
 | 401 | `PLATFORM_AUTH_REJECTED` | 平台拒绝或 code 已失效 |
 | 401 | `PLATFORM_RESPONSE_INVALID` | 平台响应缺少必要身份字段 |
 | 503 | `PLATFORM_AUTH_UNAVAILABLE` | 平台认证服务超时或不可用 |
+
+## `GET /v1/save`
+
+需要 Bearer token。每次冷启动登录成功后读取一次；不存在云存档不是错误。
+
+不存在时的成功数据：
+
+```json
+{
+  "exists": false,
+  "revision": 0,
+  "serverSavedAt": 0,
+  "save": null
+}
+```
+
+存在时额外返回 `hash` 和完整 `save`：
+
+```json
+{
+  "exists": true,
+  "revision": 3,
+  "serverSavedAt": 1789520000000,
+  "hash": "sha256 hex",
+  "save": {
+    "version": "3.4.2",
+    "serialized": 1,
+    "time": 1789519999000,
+    "modules": {
+      "settings": {},
+      "tutorial": {},
+      "user": {},
+      "task": {},
+      "activitys": {}
+    }
+  }
+}
+```
+
+## `PUT /v1/save`
+
+需要 Bearer token。请求体：
+
+```json
+{
+  "baseRevision": 3,
+  "clientVersion": "3.4.2",
+  "clientSavedAt": 1789519999000,
+  "idempotencyKey": "客户端为本次快照生成且重试时复用的唯一键",
+  "save": {
+    "version": "3.4.2",
+    "serialized": 1,
+    "time": 1789519999000,
+    "modules": {}
+  }
+}
+```
+
+保存成功数据：
+
+```json
+{
+  "revision": 4,
+  "serverSavedAt": 1789520000000,
+  "hash": "sha256 hex",
+  "duplicate": false
+}
+```
+
+相同幂等键和相同请求重放返回同一个 revision，`duplicate=true`。写入仅在 `baseRevision` 等于当前 revision 时成功；冲突返回 HTTP 409 和当前云端的 `revision/serverSavedAt/hash` 摘要，客户端不得自动覆盖。
+
+限制：JSON UTF-8 编码后最多 512 KiB；`serialized` 必须为 1；模块只允许 `settings/tutorial/user/task/activitys`；拒绝危险原型键、非有限数字、过深或节点过多的数据。
+
+错误码：
+
+| HTTP | code | 说明 |
+|---|---|---|
+| 400 | `INVALID_REQUEST` | 请求字段缺失或基础类型错误 |
+| 400 | `INVALID_SAVE` | 存档结构、模块或数值不合法 |
+| 401 | `AUTH_REQUIRED` | 未携带 Bearer token |
+| 401 | `SESSION_INVALID` | token 无效或已撤销 |
+| 401 | `SESSION_EXPIRED` | token 已过期 |
+| 409 | `SAVE_CONFLICT` | baseRevision 不是当前版本 |
+| 413 | `SAVE_TOO_LARGE` | 存档超过 512 KiB |

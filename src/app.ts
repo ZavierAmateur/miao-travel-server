@@ -2,11 +2,15 @@ import Fastify, { type FastifyInstance } from "fastify";
 import type { AppConfig } from "./config/AppConfig.js";
 import { success } from "./contracts/ApiResponse.js";
 import type { PlatformLoginService } from "./domain/auth/PlatformLoginService.js";
+import type { CloudSaveService } from "./domain/save/CloudSaveService.js";
+import { CloudSaveConflictError, CloudSaveValidationError, SessionAuthenticationError } from "./domain/save/CloudSaveErrors.js";
+import type { PutCloudSaveInput } from "./domain/save/CloudSaveValidation.js";
 import { PlatformAuthError } from "./platform/PlatformAuthError.js";
 
 export interface BuildAppOptions {
   readonly config: AppConfig;
   readonly platformLoginService?: PlatformLoginService;
+  readonly cloudSaveService?: CloudSaveService;
   readonly now?: () => number;
 }
 
@@ -22,6 +26,8 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           "req.body.anonymousCode",
           "req.body.token",
           "req.body.sessionKey",
+          "req.body.save",
+          "req.body.idempotencyKey",
         ],
         censor: "[REDACTED]",
       },
@@ -70,6 +76,36 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     });
   }
 
+  if (options.cloudSaveService) {
+    app.get("/v1/save", async (request, reply) => {
+      reply.header("cache-control", "no-store");
+      const result = await options.cloudSaveService!.get(request.headers.authorization);
+      return success(request.id, result, now());
+    });
+
+    app.put<{ Body: PutCloudSaveInput }>("/v1/save", {
+      bodyLimit: 600 * 1024,
+      schema: {
+        body: {
+          type: "object",
+          additionalProperties: false,
+          required: ["baseRevision", "clientVersion", "clientSavedAt", "save", "idempotencyKey"],
+          properties: {
+            baseRevision: { type: "integer", minimum: 0 },
+            clientVersion: { type: "string", minLength: 1, maxLength: 64 },
+            clientSavedAt: { type: "integer", minimum: 0 },
+            save: { type: "object" },
+            idempotencyKey: { type: "string", minLength: 8, maxLength: 128 },
+          },
+        },
+      },
+    }, async (request, reply) => {
+      reply.header("cache-control", "no-store");
+      const result = await options.cloudSaveService!.put(request.headers.authorization, request.body);
+      return success(request.id, result, now());
+    });
+  }
+
   app.setNotFoundHandler(async (request, reply) => {
     await reply.code(404).send({
       code: "ROUTE_NOT_FOUND",
@@ -96,6 +132,34 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         msg: error.message,
         timestamp: now(),
         requestId: request.id,
+      });
+      return;
+    }
+    if (error instanceof SessionAuthenticationError) {
+      await reply.code(401).send({
+        code: error.code,
+        msg: error.message,
+        timestamp: now(),
+        requestId: request.id,
+      });
+      return;
+    }
+    if (error instanceof CloudSaveValidationError) {
+      await reply.code(error.code === "SAVE_TOO_LARGE" ? 413 : 400).send({
+        code: error.code,
+        msg: error.message,
+        timestamp: now(),
+        requestId: request.id,
+      });
+      return;
+    }
+    if (error instanceof CloudSaveConflictError) {
+      await reply.code(409).send({
+        code: "SAVE_CONFLICT",
+        msg: error.message,
+        timestamp: now(),
+        requestId: request.id,
+        ...(error.current ? { data: { current: error.current } } : {}),
       });
       return;
     }

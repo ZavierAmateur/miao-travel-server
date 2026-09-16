@@ -8,10 +8,16 @@ import type {
 import { hashPlatformIdentity } from "../src/infrastructure/persistence/IdentityHash.js";
 import { CloudBasePlayerRepository } from "../src/infrastructure/repositories/CloudBasePlayerRepository.js";
 import { CloudBaseSessionRepository } from "../src/infrastructure/repositories/CloudBaseSessionRepository.js";
+import { CloudBaseCloudSaveRepository } from "../src/infrastructure/repositories/CloudBaseCloudSaveRepository.js";
 
 function collectionWithDocument(document: Partial<CloudBaseDocumentReference>) {
   const doc = vi.fn(() => document as CloudBaseDocumentReference);
-  return { collection: { doc } as CloudBaseCollectionReference, doc };
+  const collection = {
+    doc,
+    add: vi.fn(),
+    where: vi.fn(),
+  } as unknown as CloudBaseCollectionReference;
+  return { collection, doc };
 }
 
 describe("CloudBasePlayerRepository", () => {
@@ -121,6 +127,84 @@ describe("CloudBaseSessionRepository", () => {
       playerId: "player-1",
       createdAt: 100,
       expiresAt: 2_000,
+    });
+  });
+});
+
+describe("CloudBaseCloudSaveRepository", () => {
+  const command = {
+    playerId: "player-1",
+    baseRevision: 1,
+    clientVersion: "3.4.2",
+    clientSavedAt: 190,
+    serverSavedAt: 200,
+    idempotencyKey: "request-key-0001",
+    requestHash: "request-hash",
+    hash: "save-hash",
+    sizeBytes: 128,
+    save: {
+      version: "3.4.2",
+      serialized: 1 as const,
+      time: 190,
+      modules: { user: { level: 2 } },
+    },
+  };
+
+  it("以 playerId 和 baseRevision 条件更新，确保并发写入只有一个成功", async () => {
+    const get = vi.fn().mockResolvedValue({
+      requestId: "get-1",
+      data: [{
+        revision: 1,
+        clientVersion: "3.4.1",
+        clientSavedAt: 100,
+        serverSavedAt: 110,
+        hash: "old-hash",
+        sizeBytes: 64,
+        save: { version: "3.4.1", serialized: 1, time: 100, modules: { user: { level: 1 } } },
+        lastIdempotencyKey: "old-request",
+        lastRequestHash: "old-request-hash",
+      }],
+    });
+    const update = vi.fn().mockResolvedValue({ requestId: "update-1", updated: 1 });
+    const where = vi.fn(() => ({ get: vi.fn(), update }));
+    const collection = { doc: vi.fn(() => ({ get })), add: vi.fn(), where } as unknown as CloudBaseCollectionReference;
+    const repository = new CloudBaseCloudSaveRepository(collection);
+
+    await expect(repository.compareAndSet(command)).resolves.toMatchObject({
+      status: "saved",
+      record: { revision: 2, previous: { revision: 1, hash: "old-hash" } },
+    });
+    expect(where).toHaveBeenCalledWith({ _id: "player-1", revision: 1 });
+    expect(update).toHaveBeenCalledOnce();
+  });
+
+  it("条件更新失败后读取并返回冲突，不覆盖新版本", async () => {
+    const oldDocument = {
+      revision: 1,
+      clientVersion: "3.4.1",
+      clientSavedAt: 100,
+      serverSavedAt: 110,
+      hash: "old-hash",
+      sizeBytes: 64,
+      save: { version: "3.4.1", serialized: 1, time: 100, modules: { user: { level: 1 } } },
+      lastIdempotencyKey: "old-request",
+      lastRequestHash: "old-request-hash",
+    };
+    const newDocument = { ...oldDocument, revision: 2, hash: "other-device-hash" };
+    const get = vi.fn()
+      .mockResolvedValueOnce({ requestId: "get-before", data: [oldDocument] })
+      .mockResolvedValueOnce({ requestId: "get-after", data: [newDocument] });
+    const update = vi.fn().mockResolvedValue({ requestId: "update-0", updated: 0 });
+    const collection = {
+      doc: vi.fn(() => ({ get })),
+      add: vi.fn(),
+      where: vi.fn(() => ({ get: vi.fn(), update })),
+    } as unknown as CloudBaseCollectionReference;
+    const repository = new CloudBaseCloudSaveRepository(collection);
+
+    await expect(repository.compareAndSet(command)).resolves.toMatchObject({
+      status: "conflict",
+      current: { revision: 2, hash: "other-device-hash" },
     });
   });
 });
