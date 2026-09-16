@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import cloudbase from "@cloudbase/js-sdk";
 import { PersistenceDriver, assertPersistenceReady, loadConfig } from "../src/config/AppConfig.js";
 import type { CloudBaseDatabase } from "../src/infrastructure/persistence/CloudBaseDatabase.js";
+import { isMissingCollection, isMissingDocument } from "./cloudbase-probe-errors.js";
 
 const config = loadConfig();
 if (config.persistenceDriver !== PersistenceDriver.CloudBaseHttp) {
@@ -53,17 +54,9 @@ async function ensureCollection(database: CloudBaseDatabase, name: string): Prom
   try {
     await probe.get();
   } catch (error) {
+    if (isMissingDocument(error)) return;
     if (!isMissingCollection(error)) throw error;
     if (!database.createCollection) throw new Error("当前 CloudBase SDK 未提供集合创建能力");
     await database.createCollection(name);
   }
-}
-
-function isMissingCollection(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  const candidate = error as { code?: unknown; message?: unknown };
-  const code = typeof candidate.code === "string" ? candidate.code : "";
-  const message = typeof candidate.message === "string" ? candidate.message : "";
-  const summary = `${code} ${message}`;
-  return /collection.*(not.*exist|不存在)/i.test(summary);
 }
