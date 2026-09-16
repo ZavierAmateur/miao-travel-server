@@ -76,3 +76,7 @@ npx -y -p @cloudbase/cli@3.8.2 tcb cloudrun deploy \
 5. CloudBase `players`、`sessions` 中不存在明文 openid、unionid、token、AppSecret 或 API Key。
 6. 验证服务缩容到 0 后可以冷启动；记录首次响应耗时，但登录失败仍允许前端游客降级。
 7. 验收完成后归档服务版本、后端 commit、前端 commit、默认域名、requestId 和测试结论，不归档 Secret。
+
+## 6. CLI 诊断安全
+
+`tcb cloudrun detail --json` 的 `ServerConfig.EnvParams` 可能包含全部环境变量原文。禁止把完整输出复制到工单、聊天、日志或验收报告。必须先删除 `EnvParams`，或仅提取域名、规格、副本数、端口和版本等非敏感字段。
