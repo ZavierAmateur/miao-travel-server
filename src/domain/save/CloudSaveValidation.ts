@@ -5,7 +5,8 @@ import { CloudSaveValidationError } from "./CloudSaveErrors.js";
 export const MAX_SAVE_BYTES = 512 * 1024;
 const MAX_DEPTH = 32;
 const MAX_NODES = 20_000;
-const ALLOWED_MODULES = new Set(["settings", "tutorial", "user", "task", "activitys"]);
+export const V1_CLOUD_SAVE_MODULES = ["user"] as const;
+const LEGACY_ALLOWED_MODULES = new Set(["settings", "tutorial", "user", "task", "activitys"]);
 const FORBIDDEN_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 
 export interface PutCloudSaveInput {
@@ -38,11 +39,12 @@ export function validateCloudSaveInput(input: PutCloudSaveInput): ValidatedCloud
   }
 
   const save = validatePayload(input.save);
-  const canonicalSave = stableStringify(save);
-  const sizeBytes = Buffer.byteLength(canonicalSave, "utf8");
-  if (sizeBytes > MAX_SAVE_BYTES) {
+  const inputSizeBytes = Buffer.byteLength(stableStringify(input.save), "utf8");
+  if (inputSizeBytes > MAX_SAVE_BYTES) {
     throw new CloudSaveValidationError("SAVE_TOO_LARGE", `云存档不得超过 ${MAX_SAVE_BYTES} 字节`);
   }
+  const canonicalSave = stableStringify(save);
+  const sizeBytes = Buffer.byteLength(canonicalSave, "utf8");
   const hash = sha256(canonicalSave);
   const requestHash = sha256(stableStringify({
     baseRevision: input.baseRevision,
@@ -66,12 +68,19 @@ function validatePayload(value: unknown): CloudSavePayload {
   const moduleNames = Object.keys(value.modules);
   if (moduleNames.length < 1) throw invalid("save.modules 不能为空");
   for (const moduleName of moduleNames) {
-    if (!ALLOWED_MODULES.has(moduleName)) throw invalid(`不允许的存档模块：${moduleName}`);
+    if (!LEGACY_ALLOWED_MODULES.has(moduleName)) throw invalid(`不允许的存档模块：${moduleName}`);
   }
+  if (!isPlainObject(value.modules.user)) throw invalid("V1 云存档必须包含 user 对象");
 
   const counter = { value: 0 };
   validateJsonValue(value.modules, 0, counter);
-  return value as unknown as CloudSavePayload;
+  // 兼容旧客户端传入五模块，但服务端只持久化 V1 产品范围内的 user。
+  return {
+    version: value.version,
+    serialized: 1,
+    time: value.time as number,
+    modules: { user: value.modules.user },
+  };
 }
 
 function validateJsonValue(value: unknown, depth: number, counter: { value: number }): asserts value is JsonValue {

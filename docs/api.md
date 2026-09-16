@@ -122,11 +122,7 @@
     "serialized": 1,
     "time": 1789519999000,
     "modules": {
-      "settings": {},
-      "tutorial": {},
-      "user": {},
-      "task": {},
-      "activitys": {}
+      "user": {}
     }
   }
 }
@@ -146,7 +142,9 @@
     "version": "3.4.2",
     "serialized": 1,
     "time": 1789519999000,
-    "modules": {}
+    "modules": {
+      "user": {}
+    }
   }
 }
 ```
@@ -164,7 +162,7 @@
 
 相同幂等键和相同请求重放返回同一个 revision，`duplicate=true`。写入仅在 `baseRevision` 等于当前 revision 时成功；冲突返回 HTTP 409 和当前云端的 `revision/serverSavedAt/hash` 摘要，客户端不得自动覆盖。
 
-限制：JSON UTF-8 编码后最多 512 KiB；`serialized` 必须为 1；模块只允许 `settings/tutorial/user/task/activitys`；拒绝危险原型键、非有限数字、过深或节点过多的数据。
+限制：JSON UTF-8 编码后最多 512 KiB；`serialized` 必须为 1；V1 必须包含对象类型的 `user` 模块，服务端只持久化 `user`。为兼容已经发布的旧客户端，请求可以暂时携带 `settings/tutorial/task/activitys`，但这些字段会在校验后被丢弃，不会写入云端，也不会在读取时返回。其他模块仍拒绝；同时拒绝危险原型键、非有限数字、过深或节点过多的数据。
 
 错误码：
 

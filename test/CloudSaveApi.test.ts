@@ -77,7 +77,11 @@ describe("GET/PUT /v1/save", () => {
     expect(saved.json<{ data: object }>().data).toMatchObject({ revision: 1, duplicate: false });
 
     const loaded = await app.inject({ method: "GET", url: "/v1/save", headers: { authorization: `Bearer ${token}` } });
-    expect(loaded.json<{ data: object }>().data).toMatchObject({ exists: true, revision: 1, save: payload.save });
+    expect(loaded.json<{ data: object }>().data).toMatchObject({
+      exists: true,
+      revision: 1,
+      save: { ...payload.save, modules: { user: { level: 5 } } },
+    });
   });
 
   it("没有 Bearer token 时返回 401", async () => {

@@ -32,6 +32,19 @@ describe("云存档输入校验", () => {
     expect(first.hash).toBe(second.hash);
   });
 
+  it("兼容接收旧五模块请求但只保留 V1 user", () => {
+    const validated = validateCloudSaveInput(validInput());
+    expect(validated.save.modules).toEqual({ user: { level: 3 } });
+    expect(validated.sizeBytes).toBeLessThan(MAX_SAVE_BYTES);
+  });
+
+  it("拒绝不包含 user 的旧模块存档", () => {
+    expect(() => validateCloudSaveInput({
+      ...validInput(),
+      save: { ...validInput().save, modules: { settings: { music: 1 } } },
+    })).toThrowError(/必须包含 user 对象/);
+  });
+
   it("拒绝未列入白名单的模块", () => {
     expect(() => validateCloudSaveInput({
       ...validInput(),
