@@ -24,4 +24,4 @@
 - 内存中的待重试请求会随进程结束消失，但落盘数据与本地 revision 保留；重新登录后可安全生成新请求继续同步。
 - 最终状态：`cloudRevision=18`、`localRevision=18`、`pendingRequest=false`、`retryAttempt=0`、`automaticSyncStopped=false`、`cloudModuleKeys=["user"]`。
 
-P4B 微信开发者工具强杀恢复验收：通过。P4 仍需完成双设备旧 revision 冲突和抖音环境联调。
+P4B 微信开发者工具强杀恢复验收：通过。旧 revision 冲突已于 P4C 完成，P4 仅剩抖音环境联调。
