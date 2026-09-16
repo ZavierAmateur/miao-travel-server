@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/app.js";
 import { AppEnvironment, PersistenceDriver, PlatformKind, type AppConfig } from "../src/config/AppConfig.js";
 import { CloudSaveService } from "../src/domain/save/CloudSaveService.js";
+import type { CloudSaveRepository } from "../src/domain/save/CloudSaveRepository.js";
 import { InMemoryCloudSaveRepository } from "../src/infrastructure/repositories/InMemoryCloudSaveRepository.js";
 import { InMemorySessionRepository } from "../src/infrastructure/repositories/InMemorySessionRepository.js";
 
@@ -95,5 +96,64 @@ describe("GET/PUT /v1/save", () => {
     });
     expect(conflict.statusCode).toBe(409);
     expect(conflict.json()).toMatchObject({ code: "SAVE_CONFLICT", data: { current: { revision: 1 } } });
+  });
+
+  it("相同幂等请求重放不重复递增 revision", async () => {
+    const first = await app.inject({
+      method: "PUT",
+      url: "/v1/save",
+      headers: { authorization: `Bearer ${token}` },
+      payload,
+    });
+    const replay = await app.inject({
+      method: "PUT",
+      url: "/v1/save",
+      headers: { authorization: `Bearer ${token}` },
+      payload,
+    });
+
+    expect(first.json()).toMatchObject({ data: { revision: 1, duplicate: false } });
+    expect(replay.json()).toMatchObject({ data: { revision: 1, duplicate: true } });
+  });
+
+  it("数据库或配额异常返回脱敏 500 和可追踪 requestId", async () => {
+    const sessions = new InMemorySessionRepository();
+    await sessions.save({
+      tokenHash: createHash("sha256").update(token).digest("hex"),
+      playerId: "player-1",
+      createdAt: 1_000,
+      expiresAt: 10_000,
+    });
+    const failingRepository: CloudSaveRepository = {
+      findByPlayerId: () => Promise.reject(new Error("quota exhausted: secret-internal-detail")),
+      compareAndSet: () => Promise.reject(new Error("quota exhausted: secret-internal-detail")),
+    };
+    const failingApp = buildApp({
+      config,
+      now: () => 2_000,
+      cloudSaveService: new CloudSaveService({ sessions, saves: failingRepository, now: () => 2_000 }),
+    });
+
+    try {
+      const response = await failingApp.inject({
+        method: "GET",
+        url: "/v1/save",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "x-request-id": "p4-quota-failure-request",
+        },
+      });
+      expect(response.statusCode).toBe(500);
+      expect(response.json()).toEqual({
+        code: "INTERNAL_ERROR",
+        msg: "服务器内部错误",
+        timestamp: 2_000,
+        requestId: "p4-quota-failure-request",
+      });
+      expect(response.body).not.toContain("secret-internal-detail");
+      expect(response.body).not.toContain(token);
+    } finally {
+      await failingApp.close();
+    }
   });
 });

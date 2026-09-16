@@ -163,7 +163,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       });
       return;
     }
-    request.log.error({ err: error }, "请求处理失败");
+    request.log.error({
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    }, "请求处理失败");
     await reply.code(500).send({
       code: "INTERNAL_ERROR",
       msg: "服务器内部错误",
