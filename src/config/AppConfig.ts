@@ -61,7 +61,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const persistenceDriver = env.PERSISTENCE_DRIVER ?? PersistenceDriver.Memory;
   const cloudbaseEnvId = env.CLOUDBASE_ENV_ID?.trim() ?? "";
   const cloudbaseRegion = env.CLOUDBASE_REGION?.trim() ?? "";
-  const cloudbaseApiKey = env.CLOUDBASE_API_KEY?.trim() ?? "";
+  const cloudbaseApiKey = env.CLOUDBASE_API_KEY?.trim()
+    || env.CLOUDBASE_APIKEY?.trim()
+    || env.TCB_API_KEY?.trim()
+    || "";
   const cloudbaseDatabaseInstance = env.CLOUDBASE_DATABASE_INSTANCE?.trim() ?? "";
   const cloudDatabaseName = env.CLOUDBASE_DATABASE_NAME?.trim() ?? "";
 
@@ -75,7 +78,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   if (persistenceDriver === PersistenceDriver.CloudBaseHttp) {
     if (!cloudbaseEnvId) issues.push("CloudBase HTTP 持久化必须配置 CLOUDBASE_ENV_ID");
     if (!cloudbaseRegion) issues.push("CloudBase HTTP 持久化必须配置 CLOUDBASE_REGION");
-    if (!cloudbaseApiKey) issues.push("CloudBase HTTP 持久化必须配置 CLOUDBASE_API_KEY");
+    if (!cloudbaseApiKey) {
+      issues.push("CloudBase HTTP 持久化必须配置 CLOUDBASE_API_KEY、CLOUDBASE_APIKEY 或 TCB_API_KEY");
+    }
     if (!cloudbaseDatabaseInstance) issues.push("CloudBase HTTP 持久化必须配置 CLOUDBASE_DATABASE_INSTANCE");
     if (!cloudDatabaseName) issues.push("CloudBase HTTP 持久化必须配置 CLOUDBASE_DATABASE_NAME");
   }

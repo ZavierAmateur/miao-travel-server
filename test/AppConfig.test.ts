@@ -57,4 +57,16 @@ describe("loadConfig", () => {
     expect(config.cloudbaseEnvId).toBe("cloud1-example");
     expect(config.cloudDatabaseName).toBe("(default)");
   });
+
+  it("接受 CloudBase 托管平台注入的官方 API Key 变量名", () => {
+    const config = loadConfig({
+      PERSISTENCE_DRIVER: "cloudbase-http",
+      CLOUDBASE_ENV_ID: "cloud1-example",
+      CLOUDBASE_REGION: "ap-shanghai",
+      CLOUDBASE_APIKEY: "managed-server-api-key",
+      CLOUDBASE_DATABASE_INSTANCE: "(default)",
+      CLOUDBASE_DATABASE_NAME: "(default)",
+    });
+    expect(config.cloudbaseApiKey).toBe("managed-server-api-key");
+  });
 });

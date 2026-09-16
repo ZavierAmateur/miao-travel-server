@@ -37,7 +37,7 @@
 | `PERSISTENCE_DRIVER` | `cloudbase-http` |
 | `CLOUDBASE_ENV_ID` | 目标 CloudBase 环境 ID |
 | `CLOUDBASE_REGION` | 当前环境使用 `ap-shanghai` |
-| `CLOUDBASE_API_KEY` | 服务端 API Key，使用 Secret 管理 |
+| `CLOUDBASE_API_KEY` / `CLOUDBASE_APIKEY` / `TCB_API_KEY` | 服务端 API Key，三者只需一个；优先使用控制台“API Key 设置”的托管注入变量名 |
 | `CLOUDBASE_DATABASE_INSTANCE` | `(default)` |
 | `CLOUDBASE_DATABASE_NAME` | `(default)` |
 
