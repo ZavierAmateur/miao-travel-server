@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/app.js";
-import { AppEnvironment, PlatformKind, type AppConfig } from "../src/config/AppConfig.js";
+import { AppEnvironment, PersistenceDriver, PlatformKind, type AppConfig } from "../src/config/AppConfig.js";
 
 const config: AppConfig = {
   environment: AppEnvironment.Test,
@@ -11,6 +11,9 @@ const config: AppConfig = {
   appId: "test-app",
   appSecret: "test-secret",
   logLevel: "error",
+  persistenceDriver: PersistenceDriver.Memory,
+  cloudDatabaseUri: "",
+  cloudDatabaseName: "",
 };
 
 describe("HTTP app", () => {
@@ -41,6 +44,7 @@ describe("HTTP app", () => {
         version: "0.1.0",
         environment: "test",
         platform: "wechat",
+        persistence: "memory",
       },
     });
   });

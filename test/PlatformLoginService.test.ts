@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { AppEnvironment, PlatformKind, type AppConfig } from "../src/config/AppConfig.js";
+import { AppEnvironment, PersistenceDriver, PlatformKind, type AppConfig } from "../src/config/AppConfig.js";
 import { PlatformLoginService } from "../src/domain/auth/PlatformLoginService.js";
 import { InMemoryPlayerRepository } from "../src/infrastructure/repositories/InMemoryPlayerRepository.js";
 import { InMemorySessionRepository } from "../src/infrastructure/repositories/InMemorySessionRepository.js";
@@ -14,6 +14,9 @@ const config: AppConfig = {
   appId: "wx-app",
   appSecret: "test-secret",
   logLevel: "error",
+  persistenceDriver: PersistenceDriver.Memory,
+  cloudDatabaseUri: "",
+  cloudDatabaseName: "",
 };
 
 describe("PlatformLoginService", () => {

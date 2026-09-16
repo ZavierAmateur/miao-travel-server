@@ -66,21 +66,21 @@ export class PlatformLoginService {
           createdAt: now,
           lastLoginAt: now,
         };
-    await this.options.players.save(player);
+    const storedPlayer = await this.options.players.save(player);
 
     const token = this.createToken();
     await this.options.sessions.save({
       tokenHash: createHash("sha256").update(token).digest("hex"),
-      playerId: player.id,
+      playerId: storedPlayer.id,
       createdAt: now,
       expiresAt: now + this.sessionLifetimeMs,
     });
 
     return {
       token,
-      playerId: player.id,
-      isNew: !existing,
-      isBanned: player.status === PlayerStatus.Banned,
+      playerId: storedPlayer.id,
+      isNew: !existing && storedPlayer.id === player.id,
+      isBanned: storedPlayer.status === PlayerStatus.Banned,
       banReason: "",
       banExpire: 0,
       whiteList: false,

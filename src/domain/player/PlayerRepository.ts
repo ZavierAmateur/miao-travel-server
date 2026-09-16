@@ -10,5 +10,6 @@ export interface PlatformIdentity {
 
 export interface PlayerRepository {
   findByPlatformIdentity(identity: PlatformIdentity): Promise<Player | undefined>;
-  save(player: Player): Promise<void>;
+  /** 返回数据库中的规范玩家，解决同一身份并发首次登录时的唯一键竞争。 */
+  save(player: Player): Promise<Player>;
 }

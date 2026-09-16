@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/app.js";
-import { AppEnvironment, PlatformKind, type AppConfig } from "../src/config/AppConfig.js";
+import { AppEnvironment, PersistenceDriver, PlatformKind, type AppConfig } from "../src/config/AppConfig.js";
 import { PlatformLoginService } from "../src/domain/auth/PlatformLoginService.js";
 import { InMemoryPlayerRepository } from "../src/infrastructure/repositories/InMemoryPlayerRepository.js";
 import { InMemorySessionRepository } from "../src/infrastructure/repositories/InMemorySessionRepository.js";
@@ -15,6 +15,9 @@ const config: AppConfig = {
   appId: "wx-app",
   appSecret: "test-secret",
   logLevel: "error",
+  persistenceDriver: PersistenceDriver.Memory,
+  cloudDatabaseUri: "",
+  cloudDatabaseName: "",
 };
 
 function createLoginService(): PlatformLoginService {

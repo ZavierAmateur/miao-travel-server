@@ -8,13 +8,13 @@ export class InMemoryPlayerRepository implements PlayerRepository {
     return Promise.resolve(this.players.get(this.identityKey(identity)));
   }
 
-  save(player: Player): Promise<void> {
+  save(player: Player): Promise<Player> {
     this.players.set(this.identityKey({
       platform: player.platform,
       appId: player.appId,
       openId: player.platformOpenId,
     }), player);
-    return Promise.resolve();
+    return Promise.resolve(player);
   }
 
   private identityKey(identity: PlatformIdentity): string {

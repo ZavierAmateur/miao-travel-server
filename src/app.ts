@@ -42,6 +42,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       version: "0.1.0",
       environment: options.config.environment,
       platform: options.config.platform,
+      persistence: options.config.persistenceDriver,
     }, now());
   });
 
