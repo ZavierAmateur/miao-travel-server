@@ -18,7 +18,8 @@
     "db:check": "node --env-file-if-exists=.env --import tsx scripts/check-cloudbase-persistence.ts",
     "db:check:wechat": "node --env-file=.env.wechat.local --import tsx scripts/check-cloudbase-persistence.ts",
     "save:check": "node --env-file-if-exists=.env --import tsx scripts/check-cloud-save.ts",
-    "save:check:wechat": "node --env-file=.env.wechat.local --import tsx scripts/check-cloud-save.ts"
+    "save:check:wechat": "node --env-file=.env.wechat.local --import tsx scripts/check-cloud-save.ts",
+    "bootstrap:publish:wechat": "node --env-file=.env.wechat.local --import tsx scripts/publish-bootstrap-config.ts"
   },
   "dependencies": {
     "@cloudbase/js-sdk": "^3.9.4",

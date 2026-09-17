@@ -9,6 +9,7 @@ import { hashPlatformIdentity } from "../src/infrastructure/persistence/Identity
 import { CloudBasePlayerRepository } from "../src/infrastructure/repositories/CloudBasePlayerRepository.js";
 import { CloudBaseSessionRepository } from "../src/infrastructure/repositories/CloudBaseSessionRepository.js";
 import { CloudBaseCloudSaveRepository } from "../src/infrastructure/repositories/CloudBaseCloudSaveRepository.js";
+import { CloudBaseBootstrapConfigRepository } from "../src/infrastructure/repositories/CloudBaseBootstrapConfigRepository.js";
 
 function collectionWithDocument(document: Partial<CloudBaseDocumentReference>) {
   const doc = vi.fn(() => document as CloudBaseDocumentReference);
@@ -128,6 +129,39 @@ describe("CloudBaseSessionRepository", () => {
       createdAt: 100,
       expiresAt: 2_000,
     });
+  });
+});
+
+describe("CloudBaseBootstrapConfigRepository", () => {
+  it("固定使用 bootstrap 文档并保留内部发布审计字段", async () => {
+    const set = vi.fn().mockResolvedValue({ requestId: "config-write" });
+    const { collection, doc } = collectionWithDocument({ set });
+    const repository = new CloudBaseBootstrapConfigRepository(collection);
+    const record = {
+      revision: 4,
+      maintenanceEnabled: false,
+      maintenanceMessage: "",
+      minimumClientVersion: "3.4.2",
+      cloudSaveEnabled: true,
+      updatedAt: 2_000,
+      updatedBy: "operator",
+    };
+
+    await repository.save(record);
+
+    expect(doc).toHaveBeenCalledWith("bootstrap");
+    expect(set).toHaveBeenCalledWith(record);
+  });
+
+  it("配置文档不存在时返回未发布", async () => {
+    const get = vi.fn().mockRejectedValue({
+      code: "DOCUMENT_NOT_FOUND",
+      message: "Document not found",
+    });
+    const { collection } = collectionWithDocument({ get });
+    const repository = new CloudBaseBootstrapConfigRepository(collection);
+
+    await expect(repository.find()).resolves.toBeUndefined();
   });
 });
 

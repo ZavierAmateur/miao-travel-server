@@ -4,6 +4,7 @@ import { PlatformLoginService } from "./domain/auth/PlatformLoginService.js";
 import { CloudSaveService } from "./domain/save/CloudSaveService.js";
 import { createPersistence } from "./infrastructure/persistence/createPersistence.js";
 import { createPlatformAuthGateway } from "./platform/createPlatformAuthGateway.js";
+import { BootstrapConfigService } from "./domain/config/BootstrapConfigService.js";
 
 const config = loadConfig();
 assertPersistenceReady(config);
@@ -18,7 +19,8 @@ const cloudSaveService = new CloudSaveService({
   sessions: persistence.sessions,
   saves: persistence.saves,
 });
-const app = buildApp({ config, platformLoginService, cloudSaveService });
+const bootstrapConfigService = new BootstrapConfigService(persistence.bootstrapConfigs);
+const app = buildApp({ config, platformLoginService, cloudSaveService, bootstrapConfigService });
 
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, "开始优雅关闭服务");

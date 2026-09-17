@@ -6,11 +6,13 @@ import type { CloudSaveService } from "./domain/save/CloudSaveService.js";
 import { CloudSaveConflictError, CloudSaveValidationError, SessionAuthenticationError } from "./domain/save/CloudSaveErrors.js";
 import type { PutCloudSaveInput } from "./domain/save/CloudSaveValidation.js";
 import { PlatformAuthError } from "./platform/PlatformAuthError.js";
+import type { BootstrapConfigService } from "./domain/config/BootstrapConfigService.js";
 
 export interface BuildAppOptions {
   readonly config: AppConfig;
   readonly platformLoginService?: PlatformLoginService;
   readonly cloudSaveService?: CloudSaveService;
+  readonly bootstrapConfigService?: BootstrapConfigService;
   readonly now?: () => number;
 }
 
@@ -51,6 +53,18 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       persistence: options.config.persistenceDriver,
     }, now());
   });
+
+  if (options.bootstrapConfigService) {
+    app.get("/v1/bootstrap-config", async (request, reply) => {
+      const result = await options.bootstrapConfigService!.get();
+      reply.header("cache-control", `public, max-age=${result.data.cacheTtlSeconds}`);
+      reply.header("etag", result.etag);
+      if (request.headers["if-none-match"] === result.etag) {
+        return reply.code(304).send();
+      }
+      return success(request.id, result.data, now());
+    });
+  }
 
   if (options.platformLoginService) {
     app.post<{

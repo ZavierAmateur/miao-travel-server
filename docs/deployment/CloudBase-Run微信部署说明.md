@@ -7,7 +7,7 @@
 - CloudBase 环境：使用微信环境对应的现有环境 ID。
 - 服务名：`miao-travel-wechat`。
 - 容器端口：`3000`。
-- 访问策略：`PUBLIC`，供小游戏现有 HTTPS 客户端调用。
+- 访问策略：`PUBLIC,MINIAPP`；公网仅用于运维测试，微信小游戏通过 `wx.cloud.callContainer` 调用。
 - 最小副本数：`0`，避免空闲常驻消耗试用额度。
 - 最大副本数：`1`，首版先限制资源上限；容量验收后再调整。
 
@@ -18,7 +18,7 @@
 1. 进入目标 CloudBase 环境，选择“云函数/托管”。
 2. 新建容器型服务，服务名填写 `miao-travel-wechat`。
 3. 选择本地代码/文件夹上传，代码目录选择本仓库根目录；Dockerfile 路径为根目录的 `Dockerfile`。
-4. 服务端口填写 `3000`，访问类型选择公网访问。
+4. 服务端口填写 `3000`，访问类型同时启用公网访问和小程序/小游戏调用。
 5. 最小实例数填 `0`，最大实例数填 `1`。
 6. 按下表配置环境变量。Secret 只在控制台填写，不复制到部署包、Git、构建日志或截图。
 7. 发布后先访问 `/health`，再执行真实 `wx.login` 联调。
@@ -61,11 +61,11 @@ npx -y -p @cloudbase/cli@3.8.2 tcb cloudrun deploy \
   --port 3000 \
   --min-num 0 \
   --max-num 1 \
-  --open-access-types PUBLIC \
+  --open-access-types PUBLIC,MINIAPP \
   --wait
 ```
 
-不要使用 `--force` 跳过首次确认；先核对环境、服务名、端口、访问策略和副本数。
+不要使用 `--force` 跳过首次确认；先核对环境、服务名、端口、访问策略和副本数。禁止只填 `PUBLIC`，否则公网健康检查正常但 `wx.cloud.callContainer` 会返回 `SERVICE_FORBIDDEN`。
 
 ## 5. 上线验收
 
@@ -82,3 +82,18 @@ npx -y -p @cloudbase/cli@3.8.2 tcb cloudrun deploy \
 ## 6. CLI 诊断安全
 
 `tcb cloudrun detail --json` 的 `ServerConfig.EnvParams` 可能包含全部环境变量原文。禁止把完整输出复制到工单、聊天、日志或验收报告。必须先删除 `EnvParams`，或仅提取域名、规格、副本数、端口和版本等非敏感字段。
+## 7. 远程启动配置
+
+P5A 起需要 `remote_configs` 集合和固定文档 `bootstrap`。`npm run db:check:wechat` 会确保集合存在。
+
+首次初始化或后续更新时，在本地安全环境执行：
+
+```bash
+BOOTSTRAP_CONFIG_CONFIRM=PUBLISH \
+BOOTSTRAP_UPDATED_BY=operator-name \
+BOOTSTRAP_MAINTENANCE_ENABLED=false \
+BOOTSTRAP_CLOUD_SAVE_ENABLED=true \
+npm run bootstrap:publish:wechat
+```
+
+可选变量：`BOOTSTRAP_MAINTENANCE_MESSAGE`、`BOOTSTRAP_MINIMUM_CLIENT_VERSION`。命令不会输出 CloudBase API Key；不要把 `.env.wechat.local` 或命令行凭据提交到 Git。

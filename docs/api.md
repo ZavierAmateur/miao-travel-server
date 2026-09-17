@@ -94,6 +94,29 @@
 | 401 | `PLATFORM_RESPONSE_INVALID` | 平台响应缺少必要身份字段 |
 | 503 | `PLATFORM_AUTH_UNAVAILABLE` | 平台认证服务超时或不可用 |
 
+## `GET /v1/bootstrap-config`
+
+无需鉴权。客户端冷启动拉取一次并按 `cacheTtlSeconds` 缓存；请求失败不得阻断本地游戏。
+
+成功数据：
+
+```json
+{
+  "configRevision": 1,
+  "maintenance": {
+    "enabled": false,
+    "message": ""
+  },
+  "minimumClientVersion": "",
+  "features": {
+    "cloudSaveEnabled": true
+  },
+  "cacheTtlSeconds": 300
+}
+```
+
+应用响应包含基于配置正文计算的 `ETag` 和 `Cache-Control: public, max-age=300`。直连应用且 `If-None-Match` 匹配时返回 HTTP 304。当前 CloudBase 公网网关会覆盖这些缓存响应头，因此微信生产客户端以响应中的 `cacheTtlSeconds` 做本地缓存，不能依赖网关 304。配置不存在时返回 revision 0 的安全默认值；内部 `updatedAt/updatedBy` 不通过匿名接口返回。
+
 ## `GET /v1/save`
 
 需要 Bearer token。每次冷启动登录成功后读取一次；不存在云存档不是错误。
