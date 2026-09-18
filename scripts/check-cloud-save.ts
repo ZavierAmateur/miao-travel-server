@@ -22,9 +22,9 @@ const database = app.database({
   database: config.cloudDatabaseName,
 }) as CloudBaseDatabase;
 const collection = database.collection("cloud_saves");
-const repository = new CloudBaseCloudSaveRepository(collection);
+const repository = new CloudBaseCloudSaveRepository(collection, database.command);
 const playerId = `p3a-save-probe-${randomUUID()}`;
-const first = createCommand(playerId, 0, "p3a-idempotency-first", "request-hash-first", "save-hash-first", 1);
+const first = createCommand(playerId, 0, "p3a-idempotency-first", "request-hash-first", "save-hash-first", 1, true);
 
 try {
   const inserted = await repository.compareAndSet(first);
@@ -46,6 +46,11 @@ try {
 
   const loaded = await repository.findByPlayerId(playerId);
   if (loaded?.previous?.revision !== 1 || loaded.revision !== 2) throw new Error("当前版或上一版读取不正确");
+  const loadedUser = loaded.save.modules.user;
+  if (typeof loadedUser !== "object" || loadedUser === null || Array.isArray(loadedUser)) {
+    throw new Error("当前云存档 user 结构不正确");
+  }
+  if ("todayPlayCount" in loadedUser) throw new Error("CloudBase 更新后仍残留已省略的 user 字段");
 
   process.stdout.write(`${JSON.stringify({
     status: "ok",
@@ -68,6 +73,7 @@ function createCommand(
   requestHash: string,
   hash: string,
   level: number,
+  includeLegacyField = false,
 ): PutCloudSaveCommand {
   const now = Date.now();
   return {
@@ -84,7 +90,7 @@ function createCommand(
       version: "3.4.2",
       serialized: 1,
       time: now,
-      modules: { user: { level } },
+      modules: { user: { level, ...(includeLegacyField ? { todayPlayCount: 8 } : {}) } },
     },
   };
 }

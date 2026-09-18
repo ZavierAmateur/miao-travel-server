@@ -6,7 +6,39 @@ export const MAX_SAVE_BYTES = 512 * 1024;
 const MAX_DEPTH = 32;
 const MAX_NODES = 20_000;
 export const V1_CLOUD_SAVE_MODULES = ["user"] as const;
+export const V1_CLOUD_PLAYER_FIELDS = [
+  "saveTime",
+  "undoCount",
+  "refreshCount",
+  "bombCount",
+  "winnerStreakCount",
+  "todaySuccessCount",
+  "animals",
+  "todayVideoForEnergyCount",
+  "sevenSignProgress",
+  "sevenSignTodayState",
+  "refreshAnimalId",
+  "todayAnimalId",
+  "levelMaxProgress",
+  "subscribeStae",
+  "adFreeCount",
+  "level",
+  "energy",
+  "energyTimer",
+  "energyInfinite",
+  "gold",
+  "star",
+  "totalRechargeAmount",
+  "totalGoodBuyCounts",
+  "todayGoodBuyCounts",
+  "todayGoodsBuyTime",
+  "firstSevenAwardGot",
+  "myMiniProgramDaily",
+  "desktopDaily",
+  "todayAdReliveCount",
+] as const;
 const LEGACY_ALLOWED_MODULES = new Set(["settings", "tutorial", "user", "task", "activitys"]);
+const V1_CLOUD_PLAYER_FIELD_SET = new Set<string>(V1_CLOUD_PLAYER_FIELDS);
 const FORBIDDEN_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 
 export interface PutCloudSaveInput {
@@ -75,11 +107,31 @@ function validatePayload(value: unknown): CloudSavePayload {
   const counter = { value: 0 };
   validateJsonValue(value.modules, 0, counter);
   // 兼容旧客户端传入五模块，但服务端只持久化 V1 产品范围内的 user。
-  return {
+  return normalizeV1CloudSavePayload({
     version: value.version,
     serialized: 1,
     time: value.time as number,
     modules: { user: value.modules.user },
+  });
+}
+
+/**
+ * 把完成安全校验的客户端 user 收口为 V1 字段白名单。
+ * 未列入白名单的字段会被忽略，避免旧客户端或旧文档把废弃字段重新带回云端。
+ */
+function normalizeV1CloudSavePayload(value: CloudSavePayload): CloudSavePayload {
+  const user = value.modules.user;
+  const normalizedUser: Record<string, JsonValue> = {};
+  if (isPlainObject(user)) {
+    for (const [key, item] of Object.entries(user)) {
+      if (V1_CLOUD_PLAYER_FIELD_SET.has(key)) normalizedUser[key] = item;
+    }
+  }
+  return {
+    version: value.version,
+    serialized: 1,
+    time: value.time,
+    modules: { user: normalizedUser },
   };
 }
 

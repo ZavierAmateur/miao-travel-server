@@ -38,6 +38,25 @@ describe("云存档输入校验", () => {
     expect(validated.sizeBytes).toBeLessThan(MAX_SAVE_BYTES);
   });
 
+  it("只保留 V1 user 字段白名单，旧客户端字段不会重新写回", () => {
+    const validated = validateCloudSaveInput({
+      ...validInput(),
+      save: {
+        ...validInput().save,
+        modules: {
+          user: {
+            level: 3,
+            energy: 9,
+            nickName: "不再上云",
+            todayPlayCount: 8,
+            interstitialAdTimer: 123,
+          },
+        },
+      },
+    });
+    expect(validated.save.modules.user).toEqual({ level: 3, energy: 9 });
+  });
+
   it("拒绝不包含 user 的旧模块存档", () => {
     expect(() => validateCloudSaveInput({
       ...validInput(),

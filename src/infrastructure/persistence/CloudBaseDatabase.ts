@@ -12,6 +12,10 @@ export interface CloudBaseUpdateResult extends CloudBaseResult {
   readonly updated: number;
 }
 
+export interface CloudBaseCommand {
+  set(value: unknown): unknown;
+}
+
 export interface CloudBaseDocumentReference {
   get(): Promise<CloudBaseGetResult>;
   set(data: object): Promise<CloudBaseResult>;
@@ -30,6 +34,7 @@ export interface CloudBaseCollectionReference {
 }
 
 export interface CloudBaseDatabase {
+  readonly command: CloudBaseCommand;
   collection(name: string): CloudBaseCollectionReference;
   createCollection?(name: string): Promise<CloudBaseResult>;
 }

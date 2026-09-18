@@ -4,7 +4,10 @@ import type {
   PutCloudSaveResult,
 } from "../../domain/save/CloudSave.js";
 import type { CloudSaveRepository } from "../../domain/save/CloudSaveRepository.js";
-import type { CloudBaseCollectionReference } from "../persistence/CloudBaseDatabase.js";
+import type {
+  CloudBaseCollectionReference,
+  CloudBaseCommand,
+} from "../persistence/CloudBaseDatabase.js";
 import { isMissingDocument } from "../persistence/CloudBaseErrors.js";
 import { toSnapshot } from "./InMemoryCloudSaveRepository.js";
 
@@ -14,7 +17,10 @@ interface CloudSaveDocument extends Omit<CloudSaveRecord, "playerId"> {
 }
 
 export class CloudBaseCloudSaveRepository implements CloudSaveRepository {
-  constructor(private readonly collection: CloudBaseCollectionReference) {}
+  constructor(
+    private readonly collection: CloudBaseCollectionReference,
+    private readonly databaseCommand: CloudBaseCommand,
+  ) {}
 
   async findByPlayerId(playerId: string): Promise<CloudSaveRecord | undefined> {
     try {
@@ -40,7 +46,7 @@ export class CloudBaseCloudSaveRepository implements CloudSaveRepository {
     const result = await this.collection.where({
       _id: command.playerId,
       revision: command.baseRevision,
-    }).update(this.toDocument(record));
+    }).update(this.toUpdateDocument(record));
     if (result.updated === 1) return { status: "saved", record };
     return this.resolveConcurrentWrite(command);
   }
@@ -98,6 +104,24 @@ export class CloudBaseCloudSaveRepository implements CloudSaveRepository {
       lastIdempotencyKey: record.lastIdempotencyKey,
       lastRequestHash: record.lastRequestHash,
       ...(record.previous ? { previous: record.previous } : {}),
+    };
+  }
+
+  private toUpdateDocument(record: CloudSaveRecord): CloudSaveDocument {
+    return {
+      revision: record.revision,
+      clientVersion: record.clientVersion,
+      clientSavedAt: record.clientSavedAt,
+      serverSavedAt: record.serverSavedAt,
+      hash: record.hash,
+      sizeBytes: record.sizeBytes,
+      // CloudBase update 默认会递归合并对象；set 指令确保省略的历史键被真正删除。
+      save: this.databaseCommand.set(record.save) as CloudSaveRecord["save"],
+      lastIdempotencyKey: record.lastIdempotencyKey,
+      lastRequestHash: record.lastRequestHash,
+      ...(record.previous
+        ? { previous: this.databaseCommand.set(record.previous) as NonNullable<CloudSaveRecord["previous"]> }
+        : {}),
     };
   }
 

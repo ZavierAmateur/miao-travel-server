@@ -46,7 +46,7 @@ export function createPersistence(config: AppConfig): Promise<Persistence> {
   return Promise.resolve({
     players: new CloudBasePlayerRepository(database.collection("players")),
     sessions: new CloudBaseSessionRepository(database.collection("sessions")),
-    saves: new CloudBaseCloudSaveRepository(database.collection("cloud_saves")),
+    saves: new CloudBaseCloudSaveRepository(database.collection("cloud_saves"), database.command),
     bootstrapConfigs: new CloudBaseBootstrapConfigRepository(database.collection("remote_configs")),
     close: () => Promise.resolve(),
   });

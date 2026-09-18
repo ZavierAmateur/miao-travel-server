@@ -3,6 +3,7 @@ import { PlatformKind } from "../src/config/AppConfig.js";
 import { PlayerStatus, type Player } from "../src/domain/player/Player.js";
 import type {
   CloudBaseCollectionReference,
+  CloudBaseCommand,
   CloudBaseDocumentReference,
 } from "../src/infrastructure/persistence/CloudBaseDatabase.js";
 import { hashPlatformIdentity } from "../src/infrastructure/persistence/IdentityHash.js";
@@ -166,6 +167,8 @@ describe("CloudBaseBootstrapConfigRepository", () => {
 });
 
 describe("CloudBaseCloudSaveRepository", () => {
+  const set = vi.fn((value: unknown) => ({ $set: value }));
+  const databaseCommand = { set } as CloudBaseCommand;
   const command = {
     playerId: "player-1",
     baseRevision: 1,
@@ -185,6 +188,7 @@ describe("CloudBaseCloudSaveRepository", () => {
   };
 
   it("以 playerId 和 baseRevision 条件更新，确保并发写入只有一个成功", async () => {
+    set.mockClear();
     const get = vi.fn().mockResolvedValue({
       requestId: "get-1",
       data: [{
@@ -202,7 +206,7 @@ describe("CloudBaseCloudSaveRepository", () => {
     const update = vi.fn().mockResolvedValue({ requestId: "update-1", updated: 1 });
     const where = vi.fn(() => ({ get: vi.fn(), update }));
     const collection = { doc: vi.fn(() => ({ get })), add: vi.fn(), where } as unknown as CloudBaseCollectionReference;
-    const repository = new CloudBaseCloudSaveRepository(collection);
+    const repository = new CloudBaseCloudSaveRepository(collection, databaseCommand);
 
     await expect(repository.compareAndSet(command)).resolves.toMatchObject({
       status: "saved",
@@ -210,6 +214,11 @@ describe("CloudBaseCloudSaveRepository", () => {
     });
     expect(where).toHaveBeenCalledWith({ _id: "player-1", revision: 1 });
     expect(update).toHaveBeenCalledOnce();
+    expect(set).toHaveBeenCalledWith(command.save);
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      save: { $set: command.save },
+    }));
+    expect(set).toHaveBeenNthCalledWith(2, expect.objectContaining({ revision: 1 }));
   });
 
   it("条件更新失败后读取并返回冲突，不覆盖新版本", async () => {
@@ -234,7 +243,7 @@ describe("CloudBaseCloudSaveRepository", () => {
       add: vi.fn(),
       where: vi.fn(() => ({ get: vi.fn(), update })),
     } as unknown as CloudBaseCollectionReference;
-    const repository = new CloudBaseCloudSaveRepository(collection);
+    const repository = new CloudBaseCloudSaveRepository(collection, databaseCommand);
 
     await expect(repository.compareAndSet(command)).resolves.toMatchObject({
       status: "conflict",
