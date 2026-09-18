@@ -2,6 +2,8 @@ import type {
   CloudSaveRecord,
   PutCloudSaveCommand,
   PutCloudSaveResult,
+  RollbackCloudSaveCommand,
+  RollbackCloudSaveResult,
 } from "../../domain/save/CloudSave.js";
 import type { CloudSaveRepository } from "../../domain/save/CloudSaveRepository.js";
 import type {
@@ -49,6 +51,35 @@ export class CloudBaseCloudSaveRepository implements CloudSaveRepository {
     }).update(this.toUpdateDocument(record));
     if (result.updated === 1) return { status: "saved", record };
     return this.resolveConcurrentWrite(command);
+  }
+
+  async rollbackPrevious(command: RollbackCloudSaveCommand): Promise<RollbackCloudSaveResult> {
+    const current = await this.findByPlayerId(command.playerId);
+    if (!current || current.revision !== command.expectedRevision) {
+      return { status: "conflict", ...(current ? { current } : {}) };
+    }
+    if (!current.previous) return { status: "no_previous", current };
+    const source = current.previous;
+    const record: CloudSaveRecord = {
+      playerId: current.playerId,
+      revision: current.revision + 1,
+      clientVersion: source.clientVersion,
+      clientSavedAt: source.clientSavedAt,
+      serverSavedAt: command.serverSavedAt,
+      hash: source.hash,
+      sizeBytes: source.sizeBytes,
+      save: source.save,
+      lastIdempotencyKey: `admin-rollback:${command.auditKey}`,
+      lastRequestHash: `admin-rollback:${command.auditKey}`,
+      previous: toSnapshot(current),
+    };
+    const result = await this.collection.where({
+      _id: command.playerId,
+      revision: command.expectedRevision,
+    }).update(this.toUpdateDocument(record));
+    if (result.updated === 1) return { status: "saved", record, sourceRevision: source.revision };
+    const after = await this.findByPlayerId(command.playerId);
+    return { status: "conflict", ...(after ? { current: after } : {}) };
   }
 
   private async insertFirst(record: CloudSaveRecord, command: PutCloudSaveCommand): Promise<PutCloudSaveResult> {

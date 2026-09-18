@@ -63,6 +63,7 @@ describe("PlatformLoginService", () => {
       findByPlatformIdentity: () => Promise.resolve(undefined),
       findById: () => Promise.resolve(undefined),
       list: () => Promise.resolve([]),
+      updateAdminState: () => Promise.resolve(undefined),
       save: (player) => Promise.resolve({ ...player, id: "canonical-player" }),
     };
     const gateway: PlatformAuthGateway = {

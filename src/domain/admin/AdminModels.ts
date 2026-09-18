@@ -23,8 +23,11 @@ export interface AdminSession {
 export interface AdminAuditLog {
   readonly id: string;
   readonly adminUserId: string;
-  readonly action: "admin.login" | "admin.logout";
+  readonly action: "admin.login" | "admin.logout" | "player.ban" | "player.unban" | "save.rollback";
   readonly requestId: string;
   readonly ip: string;
   readonly createdAt: number;
+  readonly targetPlayerId?: string;
+  readonly reason?: string;
+  readonly metadata?: Readonly<Record<string, string | number | boolean>>;
 }

@@ -261,6 +261,22 @@ todayAdReliveCount
 
 返回单个玩家的基础信息、只读昵称头像资料和云存档摘要。头像 URL 可能失效，前端必须提供占位；资料和存档不存在时对应字段为 `null`。
 
+### `GET /admin/v1/players/:playerId/save`
+
+要求 `save:read`。返回 `current`、`previous` 和 `changes`；两个版本只包含 revision、客户端版本、客户端/服务端保存时间、hash、大小和白名单内 `user` 字段。`changes` 按字段名给出上一版与当前值。
+
+### `POST /admin/v1/players/:playerId/save-rollback`
+
+要求 `save:rollback`（当前仅超管拥有）。请求体为 `{ "expectedRevision": 2, "reason": "误覆盖恢复" }`。服务端仅在当前 revision 等于 `expectedRevision` 时把内嵌 `previous` 恢复为正文，同时生成更大的新 revision，并将回滚前版本轮换为新的 `previous`。成功回滚写入管理审计。
+
+### `POST /admin/v1/players/:playerId/ban`
+
+要求 `player:ban`。临时封禁请求体为 `{ "type": "temporary", "expiresAt": 1789800000000, "reason": "异常行为", "note": "内部备注" }`；永久封禁不传 `expiresAt`，且仅 `admin` 可执行。已有玩家会话在下一次资料或云存档鉴权时返回 HTTP 403 `PLAYER_BANNED`。
+
+### `POST /admin/v1/players/:playerId/unban`
+
+要求 `player:ban`，请求体为 `{ "reason": "复核通过" }`。封禁、解封、回滚均记录管理员、目标玩家、requestId、IP、原因和必要操作元数据。
+
 错误码：
 
 | HTTP | code | 说明 |
@@ -269,6 +285,10 @@ todayAdReliveCount
 | 401 | `ADMIN_AUTH_REQUIRED` 等 | 管理员会话缺失、失效或过期 |
 | 403 | `ADMIN_PERMISSION_DENIED` | 当前角色缺少 `player:read` |
 | 404 | `PLAYER_NOT_FOUND` | 玩家不存在 |
+| 404 | `SAVE_NOT_FOUND` | 玩家暂无云存档 |
+| 409 | `SAVE_PREVIOUS_NOT_FOUND` | 没有可回滚的上一版本 |
+| 409 | `SAVE_ROLLBACK_CONFLICT` | 回滚时当前 revision 已变化 |
+| 403 | `PLAYER_BANNED` | 玩家已被封禁，玩家业务请求被拒绝 |
 
 ## `GET /v1/profile`
 

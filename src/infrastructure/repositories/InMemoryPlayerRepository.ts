@@ -1,4 +1,4 @@
-import type { PlayerListQuery, PlayerRepository, PlatformIdentity } from "../../domain/player/PlayerRepository.js";
+import type { PlayerAdminState, PlayerListQuery, PlayerRepository, PlatformIdentity } from "../../domain/player/PlayerRepository.js";
 import type { Player } from "../../domain/player/Player.js";
 
 export class InMemoryPlayerRepository implements PlayerRepository {
@@ -18,6 +18,22 @@ export class InMemoryPlayerRepository implements PlayerRepository {
       .filter((player) => !query.status || player.status === query.status)
       .sort((left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id));
     return Promise.resolve(players.slice(query.offset, query.offset + query.limit));
+  }
+
+  updateAdminState(playerId: string, state: PlayerAdminState): Promise<Player | undefined> {
+    const entry = [...this.players.entries()].find(([, player]) => player.id === playerId);
+    if (!entry) return Promise.resolve(undefined);
+    const [key, player] = entry;
+    const updated: Player = {
+      ...player,
+      status: state.status,
+      ...(state.banReason ? { banReason: state.banReason } : {}),
+      ...(state.banExpiresAt !== undefined ? { banExpiresAt: state.banExpiresAt } : {}),
+      ...(state.bannedAt !== undefined ? { bannedAt: state.bannedAt } : {}),
+      ...(state.bannedBy ? { bannedBy: state.bannedBy } : {}),
+    };
+    this.players.set(key, updated);
+    return Promise.resolve(updated);
   }
 
   save(player: Player): Promise<Player> {

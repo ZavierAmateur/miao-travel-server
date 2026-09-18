@@ -41,3 +41,15 @@ export interface PutCloudSaveCommand {
 export type PutCloudSaveResult =
   | { readonly status: "saved" | "duplicate"; readonly record: CloudSaveRecord }
   | { readonly status: "conflict"; readonly current?: CloudSaveRecord };
+
+export interface RollbackCloudSaveCommand {
+  readonly playerId: string;
+  readonly expectedRevision: number;
+  readonly serverSavedAt: number;
+  readonly auditKey: string;
+}
+
+export type RollbackCloudSaveResult =
+  | { readonly status: "saved"; readonly record: CloudSaveRecord; readonly sourceRevision: number }
+  | { readonly status: "conflict"; readonly current?: CloudSaveRecord }
+  | { readonly status: "no_previous"; readonly current: CloudSaveRecord };

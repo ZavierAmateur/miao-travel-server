@@ -22,11 +22,13 @@ const platformLoginService = new PlatformLoginService({
 const cloudSaveService = new CloudSaveService({
   sessions: persistence.sessions,
   saves: persistence.saves,
+  players: persistence.players,
 });
 const bootstrapConfigService = new BootstrapConfigService(persistence.bootstrapConfigs);
 const playerProfileService = new PlayerProfileService({
   sessions: persistence.sessions,
   profiles: persistence.profiles,
+  players: persistence.players,
 });
 const adminAuthConfig = loadAdminAuthConfig();
 const adminAuthService = adminAuthConfig.enabled
@@ -49,6 +51,7 @@ const adminPlayerService = adminAuthService
       players: persistence.players,
       profiles: persistence.profiles,
       saves: persistence.saves,
+      audits: persistence.adminAudits,
     })
   : undefined;
 const app = buildApp({

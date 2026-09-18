@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { AppConfig } from "../../config/AppConfig.js";
-import { PlayerStatus, type Player } from "../player/Player.js";
+import { isPlayerBanActive, PlayerStatus, type Player } from "../player/Player.js";
 import type { PlayerRepository } from "../player/PlayerRepository.js";
 import type { SessionRepository } from "../session/SessionRepository.js";
 import type { PlatformAuthGateway, PlatformLoginCode } from "../../platform/PlatformAuthGateway.js";
@@ -54,8 +54,11 @@ export class PlatformLoginService {
       appId: this.options.config.appId,
       openId: identity.openId,
     });
+    const activeBan = existing ? isPlayerBanActive(existing, now) : false;
     const player: Player = existing
-      ? { ...existing, lastLoginAt: now }
+      ? activeBan
+        ? { ...existing, lastLoginAt: now }
+        : withoutBan({ ...existing, status: PlayerStatus.Active, lastLoginAt: now })
       : {
           id: this.createPlayerId(),
           platform: identity.platform,
@@ -80,13 +83,26 @@ export class PlatformLoginService {
       token,
       playerId: storedPlayer.id,
       isNew: !existing,
-      isBanned: storedPlayer.status === PlayerStatus.Banned,
-      banReason: "",
-      banExpire: 0,
+      isBanned: isPlayerBanActive(storedPlayer, now),
+      banReason: isPlayerBanActive(storedPlayer, now) ? storedPlayer.banReason ?? "" : "",
+      banExpire: isPlayerBanActive(storedPlayer, now) ? storedPlayer.banExpiresAt ?? 0 : 0,
       whiteList: false,
       data: "",
       saveRevision: 0,
       serverTime: now,
     };
   }
+}
+
+function withoutBan(player: Player): Player {
+  return {
+    id: player.id,
+    platform: player.platform,
+    appId: player.appId,
+    platformOpenId: player.platformOpenId,
+    ...(player.unionId ? { unionId: player.unionId } : {}),
+    status: PlayerStatus.Active,
+    createdAt: player.createdAt,
+    lastLoginAt: player.lastLoginAt,
+  };
 }

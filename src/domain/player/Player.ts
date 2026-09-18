@@ -16,4 +16,13 @@ export interface Player {
   readonly status: PlayerStatus;
   readonly createdAt: number;
   readonly lastLoginAt: number;
+  readonly banReason?: string;
+  readonly banExpiresAt?: number;
+  readonly bannedAt?: number;
+  readonly bannedBy?: string;
+}
+
+export function isPlayerBanActive(player: Player, now: number): boolean {
+  return player.status === PlayerStatus.Banned
+    && (!player.banExpiresAt || player.banExpiresAt > now);
 }

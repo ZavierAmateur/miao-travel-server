@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { PlatformKind } from "../../config/AppConfig.js";
 import type { Player, PlayerStatus } from "../../domain/player/Player.js";
-import type { PlayerListQuery, PlatformIdentity, PlayerRepository } from "../../domain/player/PlayerRepository.js";
+import type { PlayerAdminState, PlayerListQuery, PlatformIdentity, PlayerRepository } from "../../domain/player/PlayerRepository.js";
 import type { CloudBaseCollectionReference } from "../persistence/CloudBaseDatabase.js";
 import { isMissingDocument } from "../persistence/CloudBaseErrors.js";
 import { hashOptionalIdentifier, hashPlatformIdentity } from "../persistence/IdentityHash.js";
@@ -15,6 +15,10 @@ export interface CloudBasePlayerDocument {
   readonly status: PlayerStatus;
   readonly createdAt: number;
   readonly lastLoginAt: number;
+  readonly banReason?: string;
+  readonly banExpiresAt?: number;
+  readonly bannedAt?: number;
+  readonly bannedBy?: string;
 }
 
 export class CloudBasePlayerRepository implements PlayerRepository {
@@ -50,6 +54,18 @@ export class CloudBasePlayerRepository implements PlayerRepository {
     return (result.data as CloudBasePlayerDocument[]).map(toAdminPlayer);
   }
 
+  async updateAdminState(playerId: string, state: PlayerAdminState): Promise<Player | undefined> {
+    const result = await this.collection.where({ id: playerId }).update({
+      status: state.status,
+      banReason: state.banReason ?? "",
+      banExpiresAt: state.banExpiresAt ?? 0,
+      bannedAt: state.bannedAt ?? 0,
+      bannedBy: state.bannedBy ?? "",
+    });
+    if (result.updated !== 1) return undefined;
+    return this.findById(playerId);
+  }
+
   async save(player: Player): Promise<Player> {
     const identity: PlatformIdentity = {
       platform: player.platform,
@@ -67,6 +83,10 @@ export class CloudBasePlayerRepository implements PlayerRepository {
       status: player.status,
       createdAt: player.createdAt,
       lastLoginAt: player.lastLoginAt,
+      ...(player.banReason ? { banReason: player.banReason } : {}),
+      ...(player.banExpiresAt !== undefined ? { banExpiresAt: player.banExpiresAt } : {}),
+      ...(player.bannedAt !== undefined ? { bannedAt: player.bannedAt } : {}),
+      ...(player.bannedBy ? { bannedBy: player.bannedBy } : {}),
     };
     await reference.set(document);
     return this.toPlayer(document, player.platformOpenId, player.unionId);
@@ -82,6 +102,10 @@ export class CloudBasePlayerRepository implements PlayerRepository {
       status: document.status,
       createdAt: document.createdAt,
       lastLoginAt: document.lastLoginAt,
+      ...(document.banReason ? { banReason: document.banReason } : {}),
+      ...(document.banExpiresAt !== undefined ? { banExpiresAt: document.banExpiresAt } : {}),
+      ...(document.bannedAt !== undefined ? { bannedAt: document.bannedAt } : {}),
+      ...(document.bannedBy ? { bannedBy: document.bannedBy } : {}),
     };
   }
 }
@@ -95,6 +119,10 @@ function toAdminPlayer(document: CloudBasePlayerDocument): Player {
     status: document.status,
     createdAt: document.createdAt,
     lastLoginAt: document.lastLoginAt,
+    ...(document.banReason ? { banReason: document.banReason } : {}),
+    ...(document.banExpiresAt !== undefined ? { banExpiresAt: document.banExpiresAt } : {}),
+    ...(document.bannedAt !== undefined ? { bannedAt: document.bannedAt } : {}),
+    ...(document.bannedBy ? { bannedBy: document.bannedBy } : {}),
   };
 }
 

@@ -1,6 +1,6 @@
 export class SessionAuthenticationError extends Error {
   constructor(
-    readonly code: "AUTH_REQUIRED" | "SESSION_INVALID" | "SESSION_EXPIRED",
+    readonly code: "AUTH_REQUIRED" | "SESSION_INVALID" | "SESSION_EXPIRED" | "PLAYER_BANNED",
     message: string,
   ) {
     super(message);

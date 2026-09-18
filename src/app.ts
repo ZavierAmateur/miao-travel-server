@@ -174,6 +174,92 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         );
         return success(request.id, result, now());
       });
+
+      app.get<{ Params: { playerId: string } }>("/admin/v1/players/:playerId/save", {
+        schema: { params: playerIdParamsSchema },
+      }, async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        const result = await options.adminPlayerService!.getSaveDiagnostics(
+          readAdminCookie(request.headers.cookie),
+          request.params.playerId,
+        );
+        return success(request.id, result, now());
+      });
+
+      app.post<{ Params: { playerId: string }; Body: { expectedRevision: number; reason: string } }>(
+        "/admin/v1/players/:playerId/save-rollback",
+        {
+          bodyLimit: 8 * 1024,
+          schema: {
+            params: playerIdParamsSchema,
+            body: {
+              type: "object",
+              additionalProperties: false,
+              required: ["expectedRevision", "reason"],
+              properties: {
+                expectedRevision: { type: "integer", minimum: 1 },
+                reason: { type: "string", minLength: 2, maxLength: 200 },
+              },
+            },
+          },
+        },
+        async (request, reply) => {
+          reply.header("cache-control", "no-store");
+          const result = await options.adminPlayerService!.rollbackSave(
+            readAdminCookie(request.headers.cookie), request.params.playerId, request.body,
+            { requestId: request.id, ip: request.ip },
+          );
+          return success(request.id, result, now());
+        },
+      );
+
+      app.post<{
+        Params: { playerId: string };
+        Body: { type: "temporary" | "permanent"; expiresAt?: number; reason: string; note?: string };
+      }>("/admin/v1/players/:playerId/ban", {
+        bodyLimit: 8 * 1024,
+        schema: {
+          params: playerIdParamsSchema,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            required: ["type", "reason"],
+            properties: {
+              type: { type: "string", enum: ["temporary", "permanent"] },
+              expiresAt: { type: "integer", minimum: 1 },
+              reason: { type: "string", minLength: 2, maxLength: 200 },
+              note: { type: "string", maxLength: 500 },
+            },
+          },
+        },
+      }, async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        const result = await options.adminPlayerService!.ban(
+          readAdminCookie(request.headers.cookie), request.params.playerId, request.body,
+          { requestId: request.id, ip: request.ip },
+        );
+        return success(request.id, result, now());
+      });
+
+      app.post<{ Params: { playerId: string }; Body: { reason: string } }>("/admin/v1/players/:playerId/unban", {
+        bodyLimit: 8 * 1024,
+        schema: {
+          params: playerIdParamsSchema,
+          body: {
+            type: "object",
+            additionalProperties: false,
+            required: ["reason"],
+            properties: { reason: { type: "string", minLength: 2, maxLength: 200 } },
+          },
+        },
+      }, async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        const result = await options.adminPlayerService!.unban(
+          readAdminCookie(request.headers.cookie), request.params.playerId, request.body,
+          { requestId: request.id, ip: request.ip },
+        );
+        return success(request.id, result, now());
+      });
     }
   }
 
@@ -312,7 +398,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       return;
     }
     if (error instanceof SessionAuthenticationError) {
-      await reply.code(401).send({
+      await reply.code(error.code === "PLAYER_BANNED" ? 403 : 401).send({
         code: error.code,
         msg: error.message,
         timestamp: now(),
@@ -379,6 +465,13 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
   return app;
 }
+
+const playerIdParamsSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["playerId"],
+  properties: { playerId: { type: "string", minLength: 1, maxLength: 128 } },
+} as const;
 
 function readAdminCookie(cookieHeader?: string): string | undefined {
   const entry = cookieHeader?.split(";").map((part) => part.trim())

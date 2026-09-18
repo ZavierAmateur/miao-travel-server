@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { AdminRole, permissionsForRole } from "./AdminAccess.js";
+import { AdminRole, permissionsForRole, type AdminPermission } from "./AdminAccess.js";
 import { AdminAuthError } from "./AdminAuthErrors.js";
 import { hashAdminPassword, verifyAdminPassword } from "./AdminPassword.js";
 import type { AdminAuditRepository, AdminSessionRepository, AdminUserRepository } from "./AdminRepositories.js";
@@ -13,6 +13,14 @@ export interface AdminAuthServiceOptions {
   readonly audits: AdminAuditRepository;
   readonly now?: () => number;
   readonly createToken?: () => string;
+}
+
+export interface AdminIdentity {
+  readonly id: string;
+  readonly account: string;
+  readonly displayName: string;
+  readonly role: AdminRole;
+  readonly permissions: readonly AdminPermission[];
 }
 
 export class AdminAuthService {
@@ -105,12 +113,12 @@ function adminId(account: string): string {
   return createHash("sha256").update(`miao-admin:${account}`).digest("hex").slice(0, 32);
 }
 
-function toIdentity(user: AdminUser) {
+function toIdentity(user: AdminUser): AdminIdentity {
   return {
     id: user.id,
     account: user.account,
     displayName: user.displayName,
     role: user.role,
     permissions: permissionsForRole(user.role),
-  } as const;
+  };
 }

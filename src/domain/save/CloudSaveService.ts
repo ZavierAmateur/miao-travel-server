@@ -3,10 +3,12 @@ import { authenticateSession } from "../auth/SessionAuthenticator.js";
 import type { CloudSaveRepository } from "./CloudSaveRepository.js";
 import { CloudSaveConflictError } from "./CloudSaveErrors.js";
 import { validateCloudSaveInput, type PutCloudSaveInput } from "./CloudSaveValidation.js";
+import type { PlayerRepository } from "../player/PlayerRepository.js";
 
 export interface CloudSaveServiceOptions {
   readonly sessions: SessionRepository;
   readonly saves: CloudSaveRepository;
+  readonly players?: PlayerRepository;
   readonly now?: () => number;
 }
 
@@ -18,7 +20,7 @@ export class CloudSaveService {
   }
 
   async get(authorization?: string) {
-    const playerId = await authenticateSession(this.options.sessions, authorization, this.now);
+    const playerId = await authenticateSession(this.options.sessions, authorization, this.now, this.options.players);
     const record = await this.options.saves.findByPlayerId(playerId);
     if (!record) return { exists: false, revision: 0, serverSavedAt: 0, save: null } as const;
     return {
@@ -31,7 +33,7 @@ export class CloudSaveService {
   }
 
   async put(authorization: string | undefined, input: PutCloudSaveInput) {
-    const playerId = await authenticateSession(this.options.sessions, authorization, this.now);
+    const playerId = await authenticateSession(this.options.sessions, authorization, this.now, this.options.players);
     const validated = validateCloudSaveInput(input);
     const result = await this.options.saves.compareAndSet({
       playerId,

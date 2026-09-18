@@ -12,8 +12,17 @@ export interface PlayerRepository {
   findByPlatformIdentity(identity: PlatformIdentity): Promise<Player | undefined>;
   findById(playerId: string): Promise<Player | undefined>;
   list(query: PlayerListQuery): Promise<readonly Player[]>;
+  updateAdminState(playerId: string, state: PlayerAdminState): Promise<Player | undefined>;
   /** 返回数据库中的规范玩家，解决同一身份并发首次登录时的唯一键竞争。 */
   save(player: Player): Promise<Player>;
+}
+
+export interface PlayerAdminState {
+  readonly status: Player["status"];
+  readonly banReason?: string;
+  readonly banExpiresAt?: number;
+  readonly bannedAt?: number;
+  readonly bannedBy?: string;
 }
 
 export interface PlayerListQuery {

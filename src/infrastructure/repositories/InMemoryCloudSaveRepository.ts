@@ -1,4 +1,4 @@
-import type { CloudSaveRecord, CloudSaveSnapshot, PutCloudSaveCommand, PutCloudSaveResult } from "../../domain/save/CloudSave.js";
+import type { CloudSaveRecord, CloudSaveSnapshot, PutCloudSaveCommand, PutCloudSaveResult, RollbackCloudSaveCommand, RollbackCloudSaveResult } from "../../domain/save/CloudSave.js";
 import type { CloudSaveRepository } from "../../domain/save/CloudSaveRepository.js";
 
 export class InMemoryCloudSaveRepository implements CloudSaveRepository {
@@ -32,6 +32,30 @@ export class InMemoryCloudSaveRepository implements CloudSaveRepository {
     };
     this.records.set(command.playerId, record);
     return Promise.resolve({ status: "saved", record });
+  }
+
+  rollbackPrevious(command: RollbackCloudSaveCommand): Promise<RollbackCloudSaveResult> {
+    const current = this.records.get(command.playerId);
+    if (!current || current.revision !== command.expectedRevision) {
+      return Promise.resolve({ status: "conflict", ...(current ? { current } : {}) });
+    }
+    if (!current.previous) return Promise.resolve({ status: "no_previous", current });
+    const source = current.previous;
+    const record: CloudSaveRecord = {
+      playerId: current.playerId,
+      revision: current.revision + 1,
+      clientVersion: source.clientVersion,
+      clientSavedAt: source.clientSavedAt,
+      serverSavedAt: command.serverSavedAt,
+      hash: source.hash,
+      sizeBytes: source.sizeBytes,
+      save: source.save,
+      lastIdempotencyKey: `admin-rollback:${command.auditKey}`,
+      lastRequestHash: `admin-rollback:${command.auditKey}`,
+      previous: toSnapshot(current),
+    };
+    this.records.set(command.playerId, record);
+    return Promise.resolve({ status: "saved", record, sourceRevision: source.revision });
   }
 }
 

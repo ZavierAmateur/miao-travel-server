@@ -7,6 +7,7 @@ import { CloudSaveService } from "../src/domain/save/CloudSaveService.js";
 import type { CloudSaveRepository } from "../src/domain/save/CloudSaveRepository.js";
 import { InMemoryCloudSaveRepository } from "../src/infrastructure/repositories/InMemoryCloudSaveRepository.js";
 import { InMemorySessionRepository } from "../src/infrastructure/repositories/InMemorySessionRepository.js";
+import { InMemoryPlayerRepository } from "../src/infrastructure/repositories/InMemoryPlayerRepository.js";
 
 const config: AppConfig = {
   environment: AppEnvironment.Test,
@@ -90,6 +91,30 @@ describe("GET/PUT /v1/save", () => {
     expect(response.json()).toMatchObject({ code: "AUTH_REQUIRED" });
   });
 
+  it("已有玩家会话在封禁后立即停止云存档访问", async () => {
+    const sessions = new InMemorySessionRepository();
+    await sessions.save({
+      tokenHash: createHash("sha256").update(token).digest("hex"),
+      playerId: "player-1", createdAt: 1_000, expiresAt: 10_000,
+    });
+    const players = new InMemoryPlayerRepository();
+    await players.save({
+      id: "player-1", platform: PlatformKind.WeChat, appId: "wx-app", platformOpenId: "openid",
+      status: "banned", banReason: "异常行为", banExpiresAt: 9_000, createdAt: 1_000, lastLoginAt: 1_000,
+    });
+    const bannedApp = buildApp({
+      config, now: () => 2_000,
+      cloudSaveService: new CloudSaveService({ sessions, players, saves: new InMemoryCloudSaveRepository(), now: () => 2_000 }),
+    });
+    try {
+      const response = await bannedApp.inject({ method: "GET", url: "/v1/save", headers: { authorization: `Bearer ${token}` } });
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toMatchObject({ code: "PLAYER_BANNED", msg: "异常行为" });
+    } finally {
+      await bannedApp.close();
+    }
+  });
+
   it("revision 冲突时返回 409 和云端摘要", async () => {
     await app.inject({ method: "PUT", url: "/v1/save", headers: { authorization: `Bearer ${token}` }, payload });
     const conflict = await app.inject({
@@ -131,6 +156,7 @@ describe("GET/PUT /v1/save", () => {
     const failingRepository: CloudSaveRepository = {
       findByPlayerId: () => Promise.reject(new Error("quota exhausted: secret-internal-detail")),
       compareAndSet: () => Promise.reject(new Error("quota exhausted: secret-internal-detail")),
+      rollbackPrevious: () => Promise.reject(new Error("quota exhausted: secret-internal-detail")),
     };
     const failingApp = buildApp({
       config,
