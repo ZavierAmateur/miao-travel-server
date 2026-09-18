@@ -28,8 +28,8 @@
 
 - [x] `npm run save:check:wechat` 真实 CloudBase 临时探针通过：首次写入 revision 1、幂等重放保持 revision 1、整体替换更新为 revision 2、旧 revision 冲突仍返回 revision 2，且当前版不再包含首版写入的 `todayPlayCount`；随机探针文档已自动清理。
 - [x] 已以中文提交 `d09473e`（`修复云存档废弃字段残留并收紧服务端白名单`）推送到 `origin/main`。
-- [ ] CloudBase 控制台执行“更新 Git 平台部署”并发布新版本。
-- [ ] 微信开发者工具重新登录后成功 PUT，新 revision 增加。
-- [ ] 随后 GET 的当前 `save.modules.user` 仅含 29 个白名单字段。
+- [x] CloudBase 控制台已执行“更新 Git 平台部署”并发布新版本。
+- [x] 微信开发者工具已用新版本完成一次真实玩家 PUT，新 revision 正常增加。
+- [x] 随后 GET 的当前 `save.modules.user` 与 PUT 白名单字段一致，历史废弃字段不再残留。
 
-当前结论：代码、自动测试、真实数据库临时探针和提交推送已通过；云端部署和真实玩家 GET 尚未完成，暂不标记 P3C 最终验收通过。
+当前结论：P3C 的代码、自动测试、真实数据库临时探针、提交推送、云端部署和微信真实玩家 PUT/GET 已全部通过，最终验收通过。
