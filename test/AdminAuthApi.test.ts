@@ -95,4 +95,14 @@ describe("管理员认证 API", () => {
     expect(response.json<{ code: string }>().code).toBe("ADMIN_ORIGIN_FORBIDDEN");
   });
 
+  it("开发环境允许 localhost 与 127.0.0.1 同端口回环地址互换", async () => {
+    const response = await app!.inject({
+      method: "POST", url: "/admin/v1/auth/login",
+      headers: { origin: "http://localhost:5173" },
+      payload: { account: "root.admin", password: "correct-password-123" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
+  });
+
 });

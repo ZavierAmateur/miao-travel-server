@@ -61,12 +61,17 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     app.addHook("onRequest", async (request, reply) => {
       if (!request.url.startsWith("/admin/v1/")) return;
       const origin = request.headers.origin;
-      if (origin === options.adminAuthConfig!.webOrigin) {
+      const originAllowed = isAllowedAdminOrigin(
+        origin,
+        options.adminAuthConfig!.webOrigin,
+        options.adminAuthConfig!.secureCookie,
+      );
+      if (origin && originAllowed) {
         reply.header("access-control-allow-origin", origin);
         reply.header("access-control-allow-credentials", "true");
         reply.header("vary", "Origin");
       }
-      if (origin && origin !== options.adminAuthConfig!.webOrigin && request.method !== "GET") {
+      if (origin && !originAllowed && request.method !== "GET") {
         await reply.code(403).send({
           code: "ADMIN_ORIGIN_FORBIDDEN",
           msg: "管理请求来源不受信任",
@@ -329,4 +334,21 @@ function serializeAdminCookie(token: string, expiresAt: number, currentTime: num
 
 function clearAdminCookie(secure: boolean): string {
   return `${ADMIN_SESSION_COOKIE}=; Path=/admin/v1; HttpOnly; SameSite=Strict; Max-Age=0${secure ? "; Secure" : ""}`;
+}
+
+function isAllowedAdminOrigin(origin: string | undefined, configuredOrigin: string, production: boolean): boolean {
+  if (!origin) return true;
+  if (origin === configuredOrigin) return true;
+  if (production) return false;
+  try {
+    const actual = new URL(origin);
+    const configured = new URL(configuredOrigin);
+    const loopbackHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
+    return actual.protocol === configured.protocol
+      && actual.port === configured.port
+      && loopbackHosts.has(actual.hostname)
+      && loopbackHosts.has(configured.hostname);
+  } catch {
+    return false;
+  }
 }

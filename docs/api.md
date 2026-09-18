@@ -243,7 +243,7 @@ todayAdReliveCount
 | 401 | `ADMIN_SESSION_INVALID` | 会话无效或已撤销 |
 | 401 | `ADMIN_SESSION_EXPIRED` | 会话已过期 |
 | 403 | `ADMIN_ACCOUNT_DISABLED` | 管理员账号已停用 |
-| 403 | `ADMIN_ORIGIN_FORBIDDEN` | 写请求来源不是配置的管理后台域名 |
+| 403 | `ADMIN_ORIGIN_FORBIDDEN` | 写请求来源不是配置的管理后台域名；开发环境允许 localhost 与 127.0.0.1 同端口互换 |
 | 409 | `SAVE_CONFLICT` | baseRevision 不是当前版本 |
 | 413 | `SAVE_TOO_LARGE` | 存档超过 512 KiB |
 
