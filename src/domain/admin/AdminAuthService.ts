@@ -6,8 +6,6 @@ import type { AdminAuditRepository, AdminSessionRepository, AdminUserRepository 
 import type { AdminUser } from "./AdminModels.js";
 
 const SESSION_TTL_MS = 8 * 60 * 60 * 1_000;
-const FAILURE_WINDOW_MS = 15 * 60 * 1_000;
-const MAX_FAILURES = 5;
 
 export interface AdminAuthServiceOptions {
   readonly users: AdminUserRepository;
@@ -20,7 +18,6 @@ export interface AdminAuthServiceOptions {
 export class AdminAuthService {
   private readonly now: () => number;
   private readonly createToken: () => string;
-  private readonly failures = new Map<string, number[]>();
 
   constructor(private readonly options: AdminAuthServiceOptions) {
     this.now = options.now ?? Date.now;
@@ -46,15 +43,11 @@ export class AdminAuthService {
 
   async login(account: string, password: string, context: { requestId: string; ip: string }) {
     const normalized = normalizeAccount(account);
-    const failureKey = `${context.ip}:${normalized}`;
-    this.assertNotRateLimited(failureKey);
     const user = await this.options.users.findByAccount(normalized);
     if (!user || !(await verifyAdminPassword(password, user.passwordHash))) {
-      this.recordFailure(failureKey);
       throw new AdminAuthError("ADMIN_CREDENTIALS_INVALID", "账号或密码错误", 401);
     }
     if (user.status !== "active") throw new AdminAuthError("ADMIN_ACCOUNT_DISABLED", "管理员账号已停用", 403);
-    this.failures.delete(failureKey);
 
     const now = this.now();
     const token = this.createToken();
@@ -96,18 +89,6 @@ export class AdminAuthService {
     });
   }
 
-  private assertNotRateLimited(key: string): void {
-    const threshold = this.now() - FAILURE_WINDOW_MS;
-    const active = (this.failures.get(key) ?? []).filter((time) => time > threshold);
-    this.failures.set(key, active);
-    if (active.length >= MAX_FAILURES) {
-      throw new AdminAuthError("ADMIN_LOGIN_RATE_LIMITED", "登录失败次数过多，请稍后重试", 429);
-    }
-  }
-
-  private recordFailure(key: string): void {
-    this.failures.set(key, [...(this.failures.get(key) ?? []), this.now()]);
-  }
 }
 
 function normalizeAccount(account: string): string {

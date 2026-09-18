@@ -95,17 +95,4 @@ describe("管理员认证 API", () => {
     expect(response.json<{ code: string }>().code).toBe("ADMIN_ORIGIN_FORBIDDEN");
   });
 
-  it("连续五次失败后触发登录限流", async () => {
-    for (let index = 0; index < 5; index += 1) {
-      const response = await app!.inject({ method: "POST", url: "/admin/v1/auth/login", payload: {
-        account: "root.admin", password: "wrong-password",
-      } });
-      expect(response.statusCode).toBe(401);
-    }
-    const limited = await app!.inject({ method: "POST", url: "/admin/v1/auth/login", payload: {
-      account: "root.admin", password: "wrong-password",
-    } });
-    expect(limited.statusCode).toBe(429);
-    expect(limited.json<{ code: string }>().code).toBe("ADMIN_LOGIN_RATE_LIMITED");
-  });
 });

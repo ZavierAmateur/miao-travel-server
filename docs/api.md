@@ -224,7 +224,7 @@ todayAdReliveCount
 }
 ```
 
-成功数据包含 `identity`（`id/account/displayName/role/permissions`）和 `expiresAt`，同时设置 `HttpOnly; SameSite=Strict` Cookie；生产环境额外设置 `Secure`。同一 IP 和账号在 15 分钟内连续失败 5 次后返回 HTTP 429。
+成功数据包含 `identity`（`id/account/displayName/role/permissions`）和 `expiresAt`，同时设置 `HttpOnly; SameSite=Strict` Cookie；生产环境额外设置 `Secure`。当前内部管理后台不限制登录失败次数，错误凭证始终返回同一错误。
 
 ### `GET /admin/v1/auth/me`
 
@@ -244,7 +244,6 @@ todayAdReliveCount
 | 401 | `ADMIN_SESSION_EXPIRED` | 会话已过期 |
 | 403 | `ADMIN_ACCOUNT_DISABLED` | 管理员账号已停用 |
 | 403 | `ADMIN_ORIGIN_FORBIDDEN` | 写请求来源不是配置的管理后台域名 |
-| 429 | `ADMIN_LOGIN_RATE_LIMITED` | 登录失败次数过多 |
 | 409 | `SAVE_CONFLICT` | baseRevision 不是当前版本 |
 | 413 | `SAVE_TOO_LARGE` | 存档超过 512 KiB |
 
