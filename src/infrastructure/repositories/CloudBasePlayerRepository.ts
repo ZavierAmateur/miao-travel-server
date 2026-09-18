@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { PlatformKind } from "../../config/AppConfig.js";
 import type { Player, PlayerStatus } from "../../domain/player/Player.js";
-import type { PlatformIdentity, PlayerRepository } from "../../domain/player/PlayerRepository.js";
+import type { PlayerListQuery, PlatformIdentity, PlayerRepository } from "../../domain/player/PlayerRepository.js";
 import type { CloudBaseCollectionReference } from "../persistence/CloudBaseDatabase.js";
 import { isMissingDocument } from "../persistence/CloudBaseErrors.js";
 import { hashOptionalIdentifier, hashPlatformIdentity } from "../persistence/IdentityHash.js";
@@ -29,6 +29,25 @@ export class CloudBasePlayerRepository implements PlayerRepository {
       if (isMissingDocument(error)) return undefined;
       throw error;
     }
+  }
+
+  async findById(playerId: string): Promise<Player | undefined> {
+    const result = await this.collection.where({ id: playerId }).limit(1).get();
+    const document = result.data[0] as CloudBasePlayerDocument | undefined;
+    return document ? toAdminPlayer(document) : undefined;
+  }
+
+  async list(query: PlayerListQuery): Promise<readonly Player[]> {
+    const filter = {
+      ...(query.platform ? { platform: query.platform } : {}),
+      ...(query.status ? { status: query.status } : {}),
+    };
+    const result = await this.collection.where(filter)
+      .orderBy("createdAt", "desc")
+      .skip(query.offset)
+      .limit(query.limit)
+      .get();
+    return (result.data as CloudBasePlayerDocument[]).map(toAdminPlayer);
   }
 
   async save(player: Player): Promise<Player> {
@@ -65,6 +84,18 @@ export class CloudBasePlayerRepository implements PlayerRepository {
       lastLoginAt: document.lastLoginAt,
     };
   }
+}
+
+function toAdminPlayer(document: CloudBasePlayerDocument): Player {
+  return {
+    id: document.id,
+    platform: document.platform,
+    appId: document.appId,
+    platformOpenId: "[REDACTED]",
+    status: document.status,
+    createdAt: document.createdAt,
+    lastLoginAt: document.lastLoginAt,
+  };
 }
 
 function playerIdFromIdentityHash(identityHash: string): string {

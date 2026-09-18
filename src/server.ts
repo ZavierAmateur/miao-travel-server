@@ -8,6 +8,7 @@ import { BootstrapConfigService } from "./domain/config/BootstrapConfigService.j
 import { PlayerProfileService } from "./domain/profile/PlayerProfileService.js";
 import { loadAdminAuthConfig } from "./config/AdminAuthConfig.js";
 import { AdminAuthService } from "./domain/admin/AdminAuthService.js";
+import { AdminPlayerService } from "./domain/admin/AdminPlayerService.js";
 
 const config = loadConfig();
 assertPersistenceReady(config);
@@ -42,13 +43,21 @@ if (adminAuthService) {
     adminAuthConfig.bootstrapDisplayName,
   );
 }
+const adminPlayerService = adminAuthService
+  ? new AdminPlayerService({
+      auth: adminAuthService,
+      players: persistence.players,
+      profiles: persistence.profiles,
+      saves: persistence.saves,
+    })
+  : undefined;
 const app = buildApp({
   config,
   platformLoginService,
   cloudSaveService,
   bootstrapConfigService,
   playerProfileService,
-  ...(adminAuthService ? { adminAuthService, adminAuthConfig } : {}),
+  ...(adminAuthService && adminPlayerService ? { adminAuthService, adminAuthConfig, adminPlayerService } : {}),
 });
 
 const shutdown = async (signal: string): Promise<void> => {

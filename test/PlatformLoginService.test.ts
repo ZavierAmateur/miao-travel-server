@@ -61,6 +61,8 @@ describe("PlatformLoginService", () => {
   it("仓储规范化 playerId 后仍把首次登录标记为新用户", async () => {
     const players: PlayerRepository = {
       findByPlatformIdentity: () => Promise.resolve(undefined),
+      findById: () => Promise.resolve(undefined),
+      list: () => Promise.resolve([]),
       save: (player) => Promise.resolve({ ...player, id: "canonical-player" }),
     };
     const gateway: PlatformAuthGateway = {

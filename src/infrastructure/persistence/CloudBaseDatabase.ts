@@ -25,6 +25,9 @@ export interface CloudBaseDocumentReference {
 export interface CloudBaseQueryReference {
   get(): Promise<CloudBaseGetResult>;
   update(data: object): Promise<CloudBaseUpdateResult>;
+  limit(count: number): CloudBaseQueryReference;
+  skip(offset: number): CloudBaseQueryReference;
+  orderBy(field: string, orderType: "desc" | "asc"): CloudBaseQueryReference;
 }
 
 export interface CloudBaseCollectionReference {

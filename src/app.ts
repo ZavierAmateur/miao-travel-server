@@ -13,6 +13,10 @@ import { PlayerProfileValidationError } from "./domain/profile/PlayerProfileErro
 import type { AdminAuthService } from "./domain/admin/AdminAuthService.js";
 import { AdminAuthError } from "./domain/admin/AdminAuthErrors.js";
 import type { AdminAuthConfig } from "./config/AdminAuthConfig.js";
+import type { AdminPlayerService } from "./domain/admin/AdminPlayerService.js";
+import { AdminPlayerError } from "./domain/admin/AdminPlayerErrors.js";
+import type { PlatformKind } from "./config/AppConfig.js";
+import type { PlayerStatus } from "./domain/player/Player.js";
 
 const ADMIN_SESSION_COOKIE = "miao_admin_session";
 
@@ -24,6 +28,7 @@ export interface BuildAppOptions {
   readonly playerProfileService?: PlayerProfileService;
   readonly adminAuthService?: AdminAuthService;
   readonly adminAuthConfig?: AdminAuthConfig;
+  readonly adminPlayerService?: AdminPlayerService;
   readonly now?: () => number;
 }
 
@@ -125,6 +130,51 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       reply.header("set-cookie", clearAdminCookie(options.adminAuthConfig!.secureCookie));
       return success(request.id, { loggedOut: true }, now());
     });
+
+    if (options.adminPlayerService) {
+      app.get<{
+        Querystring: { playerId?: string; platform?: PlatformKind; status?: PlayerStatus; cursor?: string; limit?: number };
+      }>("/admin/v1/players", {
+        schema: {
+          querystring: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              playerId: { type: "string", minLength: 1, maxLength: 128 },
+              platform: { type: "string", enum: ["wechat", "bytedance"] },
+              status: { type: "string", enum: ["active", "banned"] },
+              cursor: { type: "string", minLength: 1, maxLength: 256 },
+              limit: { type: "integer", minimum: 1, maximum: 50 },
+            },
+          },
+        },
+      }, async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        const result = await options.adminPlayerService!.list(
+          readAdminCookie(request.headers.cookie),
+          request.query,
+        );
+        return success(request.id, result, now());
+      });
+
+      app.get<{ Params: { playerId: string } }>("/admin/v1/players/:playerId", {
+        schema: {
+          params: {
+            type: "object",
+            additionalProperties: false,
+            required: ["playerId"],
+            properties: { playerId: { type: "string", minLength: 1, maxLength: 128 } },
+          },
+        },
+      }, async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        const result = await options.adminPlayerService!.get(
+          readAdminCookie(request.headers.cookie),
+          request.params.playerId,
+        );
+        return success(request.id, result, now());
+      });
+    }
   }
 
   app.get("/health", async (request, reply) => {
@@ -299,6 +349,15 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       return;
     }
     if (error instanceof AdminAuthError) {
+      await reply.code(error.statusCode).send({
+        code: error.code,
+        msg: error.message,
+        timestamp: now(),
+        requestId: request.id,
+      });
+      return;
+    }
+    if (error instanceof AdminPlayerError) {
       await reply.code(error.statusCode).send({
         code: error.code,
         msg: error.message,

@@ -247,6 +247,29 @@ todayAdReliveCount
 | 409 | `SAVE_CONFLICT` | baseRevision 不是当前版本 |
 | 413 | `SAVE_TOO_LARGE` | 存档超过 512 KiB |
 
+## 管理端玩家查询
+
+以下接口使用管理员 Cookie 会话并要求 `player:read` 权限。响应不会返回平台 openid、unionid、存档正文、幂等键或哈希。
+
+### `GET /admin/v1/players`
+
+查询参数：`playerId`（完整 ID 精确匹配）、`platform=wechat|bytedance`、`status=active|banned`、不透明 `cursor` 和 `limit`（1～50，默认 20）。返回 `items` 和下一页 `nextCursor`；没有下一页时为 `null`。
+
+每项包含 `id/platform/status/createdAt/lastLoginAt`，有云存档时额外给出 `revision/clientVersion/clientSavedAt/serverSavedAt/sizeBytes` 摘要。玩家列表不加载昵称或头像。
+
+### `GET /admin/v1/players/:playerId`
+
+返回单个玩家的基础信息、只读昵称头像资料和云存档摘要。头像 URL 可能失效，前端必须提供占位；资料和存档不存在时对应字段为 `null`。
+
+错误码：
+
+| HTTP | code | 说明 |
+|---|---|---|
+| 400 | `INVALID_CURSOR` | 分页游标无效 |
+| 401 | `ADMIN_AUTH_REQUIRED` 等 | 管理员会话缺失、失效或过期 |
+| 403 | `ADMIN_PERMISSION_DENIED` | 当前角色缺少 `player:read` |
+| 404 | `PLAYER_NOT_FOUND` | 玩家不存在 |
+
 ## `GET /v1/profile`
 
 需要 Bearer token。玩家昵称头像与玩法云存档分离，每次登录成功后最多读取一次。资料尚未设置不是错误：
