@@ -6,6 +6,8 @@ import { createPersistence } from "./infrastructure/persistence/createPersistenc
 import { createPlatformAuthGateway } from "./platform/createPlatformAuthGateway.js";
 import { BootstrapConfigService } from "./domain/config/BootstrapConfigService.js";
 import { PlayerProfileService } from "./domain/profile/PlayerProfileService.js";
+import { loadAdminAuthConfig } from "./config/AdminAuthConfig.js";
+import { AdminAuthService } from "./domain/admin/AdminAuthService.js";
 
 const config = loadConfig();
 assertPersistenceReady(config);
@@ -25,12 +27,28 @@ const playerProfileService = new PlayerProfileService({
   sessions: persistence.sessions,
   profiles: persistence.profiles,
 });
+const adminAuthConfig = loadAdminAuthConfig();
+const adminAuthService = adminAuthConfig.enabled
+  ? new AdminAuthService({
+      users: persistence.adminUsers,
+      sessions: persistence.adminSessions,
+      audits: persistence.adminAudits,
+    })
+  : undefined;
+if (adminAuthService) {
+  await adminAuthService.ensureBootstrapAdmin(
+    adminAuthConfig.bootstrapAccount,
+    adminAuthConfig.bootstrapPassword,
+    adminAuthConfig.bootstrapDisplayName,
+  );
+}
 const app = buildApp({
   config,
   platformLoginService,
   cloudSaveService,
   bootstrapConfigService,
   playerProfileService,
+  ...(adminAuthService ? { adminAuthService, adminAuthConfig } : {}),
 });
 
 const shutdown = async (signal: string): Promise<void> => {

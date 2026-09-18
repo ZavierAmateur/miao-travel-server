@@ -16,6 +16,9 @@ import { CloudBaseBootstrapConfigRepository } from "../repositories/CloudBaseBoo
 import type { PlayerProfileRepository } from "../../domain/profile/PlayerProfileRepository.js";
 import { InMemoryPlayerProfileRepository } from "../repositories/InMemoryPlayerProfileRepository.js";
 import { CloudBasePlayerProfileRepository } from "../repositories/CloudBasePlayerProfileRepository.js";
+import type { AdminAuditRepository, AdminSessionRepository, AdminUserRepository } from "../../domain/admin/AdminRepositories.js";
+import { InMemoryAdminAuditRepository, InMemoryAdminSessionRepository, InMemoryAdminUserRepository } from "../repositories/InMemoryAdminRepositories.js";
+import { CloudBaseAdminAuditRepository, CloudBaseAdminSessionRepository, CloudBaseAdminUserRepository } from "../repositories/CloudBaseAdminRepositories.js";
 
 export interface Persistence {
   readonly players: PlayerRepository;
@@ -23,6 +26,9 @@ export interface Persistence {
   readonly saves: CloudSaveRepository;
   readonly bootstrapConfigs: BootstrapConfigRepository;
   readonly profiles: PlayerProfileRepository;
+  readonly adminUsers: AdminUserRepository;
+  readonly adminSessions: AdminSessionRepository;
+  readonly adminAudits: AdminAuditRepository;
   close(): Promise<void>;
 }
 
@@ -34,6 +40,9 @@ export function createPersistence(config: AppConfig): Promise<Persistence> {
       saves: new InMemoryCloudSaveRepository(),
       bootstrapConfigs: new InMemoryBootstrapConfigRepository(),
       profiles: new InMemoryPlayerProfileRepository(),
+      adminUsers: new InMemoryAdminUserRepository(),
+      adminSessions: new InMemoryAdminSessionRepository(),
+      adminAudits: new InMemoryAdminAuditRepository(),
       close: () => Promise.resolve(),
     });
   }
@@ -54,6 +63,9 @@ export function createPersistence(config: AppConfig): Promise<Persistence> {
     saves: new CloudBaseCloudSaveRepository(database.collection("cloud_saves"), database.command),
     bootstrapConfigs: new CloudBaseBootstrapConfigRepository(database.collection("remote_configs")),
     profiles: new CloudBasePlayerProfileRepository(database.collection("player_profiles")),
+    adminUsers: new CloudBaseAdminUserRepository(database.collection("admin_users")),
+    adminSessions: new CloudBaseAdminSessionRepository(database.collection("admin_sessions")),
+    adminAudits: new CloudBaseAdminAuditRepository(database.collection("admin_audit_logs")),
     close: () => Promise.resolve(),
   });
 }

@@ -210,6 +210,41 @@ todayAdReliveCount
 | 401 | `AUTH_REQUIRED` | 未携带 Bearer token |
 | 401 | `SESSION_INVALID` | token 无效或已撤销 |
 | 401 | `SESSION_EXPIRED` | token 已过期 |
+
+## 管理员认证 `/admin/v1/auth/*`
+
+管理员认证与玩家 Bearer 会话完全独立。V1 角色仅为 `admin`（超管）和 `operator`（运营）。管理会话通过 `miao_admin_session` HttpOnly Cookie 传递，响应正文不返回 token。
+
+### `POST /admin/v1/auth/login`
+
+```json
+{
+  "account": "root.admin",
+  "password": "管理员密码"
+}
+```
+
+成功数据包含 `identity`（`id/account/displayName/role/permissions`）和 `expiresAt`，同时设置 `HttpOnly; SameSite=Strict` Cookie；生产环境额外设置 `Secure`。同一 IP 和账号在 15 分钟内连续失败 5 次后返回 HTTP 429。
+
+### `GET /admin/v1/auth/me`
+
+读取当前 Cookie 会话，返回管理员身份、角色、权限和过期时间。账号停用、会话撤销或过期均拒绝访问。
+
+### `POST /admin/v1/auth/logout`
+
+撤销服务端会话并清除 Cookie。登录和退出均写入 `admin_audit_logs`。
+
+错误码：
+
+| HTTP | code | 说明 |
+|---|---|---|
+| 401 | `ADMIN_AUTH_REQUIRED` | 缺少管理员会话 |
+| 401 | `ADMIN_CREDENTIALS_INVALID` | 账号或密码错误，不区分账号是否存在 |
+| 401 | `ADMIN_SESSION_INVALID` | 会话无效或已撤销 |
+| 401 | `ADMIN_SESSION_EXPIRED` | 会话已过期 |
+| 403 | `ADMIN_ACCOUNT_DISABLED` | 管理员账号已停用 |
+| 403 | `ADMIN_ORIGIN_FORBIDDEN` | 写请求来源不是配置的管理后台域名 |
+| 429 | `ADMIN_LOGIN_RATE_LIMITED` | 登录失败次数过多 |
 | 409 | `SAVE_CONFLICT` | baseRevision 不是当前版本 |
 | 413 | `SAVE_TOO_LARGE` | 存档超过 512 KiB |
 

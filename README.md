@@ -37,6 +37,19 @@ npm run db:check
 
 微信本地配置使用 `.env.wechat.local` 时可运行 `npm run db:check:wechat`。
 
+## 管理员认证
+
+V1 只保留 `admin`（超管）和 `operator`（运营）两个角色。管理员认证与玩家登录完全独立；同时配置以下环境变量后才启用 `/admin/v1/auth/*`：
+
+```bash
+ADMIN_BOOTSTRAP_ACCOUNT=root.admin
+ADMIN_BOOTSTRAP_PASSWORD=至少12字符的初始密码
+ADMIN_BOOTSTRAP_DISPLAY_NAME=超级管理员
+ADMIN_WEB_ORIGIN=http://127.0.0.1:5173
+```
+
+首次启动会创建初始超管；已存在同账号时不会用环境变量覆盖密码。生产初始密码必须存入云端 Secret，创建完成后应按后续密码轮换流程移除或轮换。
+
 ## CloudBase Run 部署
 
 仓库根目录已经提供生产用多阶段 `Dockerfile` 和 `.dockerignore`。微信首次云端部署的服务参数、环境变量与验收步骤见：`docs/deployment/CloudBase-Run微信部署说明.md`。

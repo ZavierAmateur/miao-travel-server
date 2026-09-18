@@ -10,6 +10,11 @@ import type { BootstrapConfigService } from "./domain/config/BootstrapConfigServ
 import type { PlayerProfileService } from "./domain/profile/PlayerProfileService.js";
 import type { PutPlayerProfileInput } from "./domain/profile/PlayerProfile.js";
 import { PlayerProfileValidationError } from "./domain/profile/PlayerProfileErrors.js";
+import type { AdminAuthService } from "./domain/admin/AdminAuthService.js";
+import { AdminAuthError } from "./domain/admin/AdminAuthErrors.js";
+import type { AdminAuthConfig } from "./config/AdminAuthConfig.js";
+
+const ADMIN_SESSION_COOKIE = "miao_admin_session";
 
 export interface BuildAppOptions {
   readonly config: AppConfig;
@@ -17,6 +22,8 @@ export interface BuildAppOptions {
   readonly cloudSaveService?: CloudSaveService;
   readonly bootstrapConfigService?: BootstrapConfigService;
   readonly playerProfileService?: PlayerProfileService;
+  readonly adminAuthService?: AdminAuthService;
+  readonly adminAuthConfig?: AdminAuthConfig;
   readonly now?: () => number;
 }
 
@@ -36,6 +43,8 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           "req.body.idempotencyKey",
           "req.body.nickName",
           "req.body.avatarUrl",
+          "req.body.password",
+          "req.headers.cookie",
         ],
         censor: "[REDACTED]",
       },
@@ -47,6 +56,71 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         : crypto.randomUUID();
     },
   });
+
+  if (options.adminAuthService && options.adminAuthConfig) {
+    app.addHook("onRequest", async (request, reply) => {
+      if (!request.url.startsWith("/admin/v1/")) return;
+      const origin = request.headers.origin;
+      if (origin === options.adminAuthConfig!.webOrigin) {
+        reply.header("access-control-allow-origin", origin);
+        reply.header("access-control-allow-credentials", "true");
+        reply.header("vary", "Origin");
+      }
+      if (origin && origin !== options.adminAuthConfig!.webOrigin && request.method !== "GET") {
+        await reply.code(403).send({
+          code: "ADMIN_ORIGIN_FORBIDDEN",
+          msg: "管理请求来源不受信任",
+          timestamp: now(),
+          requestId: request.id,
+        });
+        return;
+      }
+      if (request.method === "OPTIONS") {
+        reply.header("access-control-allow-methods", "GET,POST,OPTIONS");
+        reply.header("access-control-allow-headers", "Content-Type,X-Request-Id");
+        await reply.code(204).send();
+      }
+    });
+
+    app.post<{ Body: { account: string; password: string } }>("/admin/v1/auth/login", {
+      bodyLimit: 8 * 1024,
+      schema: {
+        body: {
+          type: "object",
+          additionalProperties: false,
+          required: ["account", "password"],
+          properties: {
+            account: { type: "string", minLength: 3, maxLength: 64 },
+            password: { type: "string", minLength: 1, maxLength: 256 },
+          },
+        },
+      },
+    }, async (request, reply) => {
+      reply.header("cache-control", "no-store");
+      const result = await options.adminAuthService!.login(request.body.account, request.body.password, {
+        requestId: request.id,
+        ip: request.ip,
+      });
+      reply.header("set-cookie", serializeAdminCookie(result.token, result.expiresAt, now(), options.adminAuthConfig!.secureCookie));
+      return success(request.id, { identity: result.identity, expiresAt: result.expiresAt }, now());
+    });
+
+    app.get("/admin/v1/auth/me", async (request, reply) => {
+      reply.header("cache-control", "no-store");
+      const result = await options.adminAuthService!.authenticate(readAdminCookie(request.headers.cookie));
+      return success(request.id, { identity: result.identity, expiresAt: result.session.expiresAt }, now());
+    });
+
+    app.post("/admin/v1/auth/logout", async (request, reply) => {
+      reply.header("cache-control", "no-store");
+      await options.adminAuthService!.logout(readAdminCookie(request.headers.cookie), {
+        requestId: request.id,
+        ip: request.ip,
+      });
+      reply.header("set-cookie", clearAdminCookie(options.adminAuthConfig!.secureCookie));
+      return success(request.id, { loggedOut: true }, now());
+    });
+  }
 
   app.get("/health", async (request, reply) => {
     reply.header("cache-control", "no-store");
@@ -219,6 +293,15 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       });
       return;
     }
+    if (error instanceof AdminAuthError) {
+      await reply.code(error.statusCode).send({
+        code: error.code,
+        msg: error.message,
+        timestamp: now(),
+        requestId: request.id,
+      });
+      return;
+    }
     request.log.error({
       errorName: error instanceof Error ? error.name : "UnknownError",
     }, "请求处理失败");
@@ -231,4 +314,19 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   });
 
   return app;
+}
+
+function readAdminCookie(cookieHeader?: string): string | undefined {
+  const entry = cookieHeader?.split(";").map((part) => part.trim())
+    .find((part) => part.startsWith(`${ADMIN_SESSION_COOKIE}=`));
+  return entry ? decodeURIComponent(entry.slice(ADMIN_SESSION_COOKIE.length + 1)) : undefined;
+}
+
+function serializeAdminCookie(token: string, expiresAt: number, currentTime: number, secure: boolean): string {
+  const maxAge = Math.max(0, Math.floor((expiresAt - currentTime) / 1_000));
+  return `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/admin/v1; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
+}
+
+function clearAdminCookie(secure: boolean): string {
+  return `${ADMIN_SESSION_COOKIE}=; Path=/admin/v1; HttpOnly; SameSite=Strict; Max-Age=0${secure ? "; Secure" : ""}`;
 }
