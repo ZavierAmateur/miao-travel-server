@@ -5,6 +5,7 @@ import { CloudSaveService } from "./domain/save/CloudSaveService.js";
 import { createPersistence } from "./infrastructure/persistence/createPersistence.js";
 import { createPlatformAuthGateway } from "./platform/createPlatformAuthGateway.js";
 import { BootstrapConfigService } from "./domain/config/BootstrapConfigService.js";
+import { PlayerProfileService } from "./domain/profile/PlayerProfileService.js";
 
 const config = loadConfig();
 assertPersistenceReady(config);
@@ -20,7 +21,17 @@ const cloudSaveService = new CloudSaveService({
   saves: persistence.saves,
 });
 const bootstrapConfigService = new BootstrapConfigService(persistence.bootstrapConfigs);
-const app = buildApp({ config, platformLoginService, cloudSaveService, bootstrapConfigService });
+const playerProfileService = new PlayerProfileService({
+  sessions: persistence.sessions,
+  profiles: persistence.profiles,
+});
+const app = buildApp({
+  config,
+  platformLoginService,
+  cloudSaveService,
+  bootstrapConfigService,
+  playerProfileService,
+});
 
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, "开始优雅关闭服务");

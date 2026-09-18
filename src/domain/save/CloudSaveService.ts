@@ -1,7 +1,7 @@
-import { createHash } from "node:crypto";
 import type { SessionRepository } from "../session/SessionRepository.js";
+import { authenticateSession } from "../auth/SessionAuthenticator.js";
 import type { CloudSaveRepository } from "./CloudSaveRepository.js";
-import { CloudSaveConflictError, SessionAuthenticationError } from "./CloudSaveErrors.js";
+import { CloudSaveConflictError } from "./CloudSaveErrors.js";
 import { validateCloudSaveInput, type PutCloudSaveInput } from "./CloudSaveValidation.js";
 
 export interface CloudSaveServiceOptions {
@@ -18,7 +18,7 @@ export class CloudSaveService {
   }
 
   async get(authorization?: string) {
-    const playerId = await this.authenticate(authorization);
+    const playerId = await authenticateSession(this.options.sessions, authorization, this.now);
     const record = await this.options.saves.findByPlayerId(playerId);
     if (!record) return { exists: false, revision: 0, serverSavedAt: 0, save: null } as const;
     return {
@@ -31,7 +31,7 @@ export class CloudSaveService {
   }
 
   async put(authorization: string | undefined, input: PutCloudSaveInput) {
-    const playerId = await this.authenticate(authorization);
+    const playerId = await authenticateSession(this.options.sessions, authorization, this.now);
     const validated = validateCloudSaveInput(input);
     const result = await this.options.saves.compareAndSet({
       playerId,
@@ -54,17 +54,4 @@ export class CloudSaveService {
     };
   }
 
-  private async authenticate(authorization?: string): Promise<string> {
-    const match = /^Bearer\s+(.+)$/i.exec(authorization?.trim() ?? "");
-    if (!match) throw new SessionAuthenticationError("AUTH_REQUIRED", "缺少登录凭证");
-    const tokenHash = createHash("sha256").update(match[1]!).digest("hex");
-    const session = await this.options.sessions.findByTokenHash(tokenHash);
-    if (!session || session.revokedAt !== undefined) {
-      throw new SessionAuthenticationError("SESSION_INVALID", "登录凭证无效");
-    }
-    if (session.expiresAt <= this.now()) {
-      throw new SessionAuthenticationError("SESSION_EXPIRED", "登录凭证已过期");
-    }
-    return session.playerId;
-  }
 }

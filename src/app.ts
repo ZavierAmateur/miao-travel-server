@@ -7,12 +7,16 @@ import { CloudSaveConflictError, CloudSaveValidationError, SessionAuthentication
 import type { PutCloudSaveInput } from "./domain/save/CloudSaveValidation.js";
 import { PlatformAuthError } from "./platform/PlatformAuthError.js";
 import type { BootstrapConfigService } from "./domain/config/BootstrapConfigService.js";
+import type { PlayerProfileService } from "./domain/profile/PlayerProfileService.js";
+import type { PutPlayerProfileInput } from "./domain/profile/PlayerProfile.js";
+import { PlayerProfileValidationError } from "./domain/profile/PlayerProfileErrors.js";
 
 export interface BuildAppOptions {
   readonly config: AppConfig;
   readonly platformLoginService?: PlatformLoginService;
   readonly cloudSaveService?: CloudSaveService;
   readonly bootstrapConfigService?: BootstrapConfigService;
+  readonly playerProfileService?: PlayerProfileService;
   readonly now?: () => number;
 }
 
@@ -30,6 +34,8 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
           "req.body.sessionKey",
           "req.body.save",
           "req.body.idempotencyKey",
+          "req.body.nickName",
+          "req.body.avatarUrl",
         ],
         censor: "[REDACTED]",
       },
@@ -120,6 +126,33 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     });
   }
 
+  if (options.playerProfileService) {
+    app.get("/v1/profile", async (request, reply) => {
+      reply.header("cache-control", "no-store");
+      const result = await options.playerProfileService!.get(request.headers.authorization);
+      return success(request.id, result, now());
+    });
+
+    app.put<{ Body: PutPlayerProfileInput }>("/v1/profile", {
+      bodyLimit: 8 * 1024,
+      schema: {
+        body: {
+          type: "object",
+          additionalProperties: false,
+          required: ["nickName", "avatarUrl"],
+          properties: {
+            nickName: { type: "string", minLength: 1, maxLength: 64 },
+            avatarUrl: { type: "string", maxLength: 2_048 },
+          },
+        },
+      },
+    }, async (request, reply) => {
+      reply.header("cache-control", "no-store");
+      const result = await options.playerProfileService!.put(request.headers.authorization, request.body);
+      return success(request.id, result, now());
+    });
+  }
+
   app.setNotFoundHandler(async (request, reply) => {
     await reply.code(404).send({
       code: "ROUTE_NOT_FOUND",
@@ -174,6 +207,15 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         timestamp: now(),
         requestId: request.id,
         ...(error.current ? { data: { current: error.current } } : {}),
+      });
+      return;
+    }
+    if (error instanceof PlayerProfileValidationError) {
+      await reply.code(400).send({
+        code: error.code,
+        msg: error.message,
+        timestamp: now(),
+        requestId: request.id,
       });
       return;
     }

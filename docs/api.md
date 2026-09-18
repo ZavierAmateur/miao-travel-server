@@ -212,3 +212,51 @@ todayAdReliveCount
 | 401 | `SESSION_EXPIRED` | token 已过期 |
 | 409 | `SAVE_CONFLICT` | baseRevision 不是当前版本 |
 | 413 | `SAVE_TOO_LARGE` | 存档超过 512 KiB |
+
+## `GET /v1/profile`
+
+需要 Bearer token。玩家昵称头像与玩法云存档分离，每次登录成功后最多读取一次。资料尚未设置不是错误：
+
+```json
+{
+  "exists": false,
+  "nickName": "",
+  "avatarUrl": "",
+  "updatedAt": 0
+}
+```
+
+存在资料时返回 `exists=true` 以及当前 `nickName/avatarUrl/updatedAt`。头像只保存微信返回的 HTTPS URL，不复制图片文件；用户更换微信头像后旧 URL 可能失效，需要再次主动同步。
+
+## `PUT /v1/profile`
+
+需要 Bearer token。只能由客户端在用户点击微信原生资料授权按钮并取得结果后调用：
+
+```json
+{
+  "nickName": "旅行猫",
+  "avatarUrl": "https://example.com/avatar.png"
+}
+```
+
+规则：昵称去除首尾空白后为 1～32 个 Unicode 字符，不允许控制字符；头像可为空，否则必须为不超过 2048 字符的 HTTPS URL。额外字段会被 HTTP 校验层丢弃，服务端只保存上述两项及服务端生成的 `updatedAt`。请求日志对昵称和头像地址脱敏。
+
+成功数据：
+
+```json
+{
+  "nickName": "旅行猫",
+  "avatarUrl": "https://example.com/avatar.png",
+  "updatedAt": 1789520000000
+}
+```
+
+错误码：
+
+| HTTP | code | 说明 |
+|---|---|---|
+| 400 | `INVALID_REQUEST` | 请求字段缺失或基础类型错误 |
+| 400 | `INVALID_PROFILE` | 昵称或头像地址不符合资料规则 |
+| 401 | `AUTH_REQUIRED` | 未携带 Bearer token |
+| 401 | `SESSION_INVALID` | token 无效或已撤销 |
+| 401 | `SESSION_EXPIRED` | token 已过期 |

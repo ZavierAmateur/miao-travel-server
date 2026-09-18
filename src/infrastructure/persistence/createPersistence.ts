@@ -13,12 +13,16 @@ import { CloudBaseCloudSaveRepository } from "../repositories/CloudBaseCloudSave
 import type { BootstrapConfigRepository } from "../../domain/config/BootstrapConfigRepository.js";
 import { InMemoryBootstrapConfigRepository } from "../repositories/InMemoryBootstrapConfigRepository.js";
 import { CloudBaseBootstrapConfigRepository } from "../repositories/CloudBaseBootstrapConfigRepository.js";
+import type { PlayerProfileRepository } from "../../domain/profile/PlayerProfileRepository.js";
+import { InMemoryPlayerProfileRepository } from "../repositories/InMemoryPlayerProfileRepository.js";
+import { CloudBasePlayerProfileRepository } from "../repositories/CloudBasePlayerProfileRepository.js";
 
 export interface Persistence {
   readonly players: PlayerRepository;
   readonly sessions: SessionRepository;
   readonly saves: CloudSaveRepository;
   readonly bootstrapConfigs: BootstrapConfigRepository;
+  readonly profiles: PlayerProfileRepository;
   close(): Promise<void>;
 }
 
@@ -29,6 +33,7 @@ export function createPersistence(config: AppConfig): Promise<Persistence> {
       sessions: new InMemorySessionRepository(),
       saves: new InMemoryCloudSaveRepository(),
       bootstrapConfigs: new InMemoryBootstrapConfigRepository(),
+      profiles: new InMemoryPlayerProfileRepository(),
       close: () => Promise.resolve(),
     });
   }
@@ -48,6 +53,7 @@ export function createPersistence(config: AppConfig): Promise<Persistence> {
     sessions: new CloudBaseSessionRepository(database.collection("sessions")),
     saves: new CloudBaseCloudSaveRepository(database.collection("cloud_saves"), database.command),
     bootstrapConfigs: new CloudBaseBootstrapConfigRepository(database.collection("remote_configs")),
+    profiles: new CloudBasePlayerProfileRepository(database.collection("player_profiles")),
     close: () => Promise.resolve(),
   });
 }

@@ -11,6 +11,7 @@ import { CloudBasePlayerRepository } from "../src/infrastructure/repositories/Cl
 import { CloudBaseSessionRepository } from "../src/infrastructure/repositories/CloudBaseSessionRepository.js";
 import { CloudBaseCloudSaveRepository } from "../src/infrastructure/repositories/CloudBaseCloudSaveRepository.js";
 import { CloudBaseBootstrapConfigRepository } from "../src/infrastructure/repositories/CloudBaseBootstrapConfigRepository.js";
+import { CloudBasePlayerProfileRepository } from "../src/infrastructure/repositories/CloudBasePlayerProfileRepository.js";
 
 function collectionWithDocument(document: Partial<CloudBaseDocumentReference>) {
   const doc = vi.fn(() => document as CloudBaseDocumentReference);
@@ -130,6 +131,39 @@ describe("CloudBaseSessionRepository", () => {
       createdAt: 100,
       expiresAt: 2_000,
     });
+  });
+});
+
+describe("CloudBasePlayerProfileRepository", () => {
+  it("以 playerId 为文档主键，且只保存昵称、头像地址和更新时间", async () => {
+    const set = vi.fn().mockResolvedValue({ requestId: "profile-write" });
+    const { collection, doc } = collectionWithDocument({ set });
+    const repository = new CloudBasePlayerProfileRepository(collection);
+
+    await repository.save({
+      playerId: "player-profile-1",
+      nickName: "旅行猫",
+      avatarUrl: "https://example.com/avatar.png",
+      updatedAt: 2_000,
+    });
+
+    expect(doc).toHaveBeenCalledWith("player-profile-1");
+    expect(set).toHaveBeenCalledWith({
+      nickName: "旅行猫",
+      avatarUrl: "https://example.com/avatar.png",
+      updatedAt: 2_000,
+    });
+  });
+
+  it("资料文档不存在时返回未设置", async () => {
+    const get = vi.fn().mockRejectedValue({
+      code: "DOCUMENT_NOT_FOUND",
+      message: "Document not found",
+    });
+    const { collection } = collectionWithDocument({ get });
+    const repository = new CloudBasePlayerProfileRepository(collection);
+
+    await expect(repository.findByPlayerId("missing-player")).resolves.toBeUndefined();
   });
 });
 

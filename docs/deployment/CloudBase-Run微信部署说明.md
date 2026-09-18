@@ -97,3 +97,14 @@ npm run bootstrap:publish:wechat
 ```
 
 可选变量：`BOOTSTRAP_MAINTENANCE_MESSAGE`、`BOOTSTRAP_MINIMUM_CLIENT_VERSION`。命令不会输出 CloudBase API Key；不要把 `.env.wechat.local` 或命令行凭据提交到 Git。
+
+## 8. 玩家头像昵称资料
+
+P5B1 起需要 `player_profiles` 集合。部署新代码前后均可执行：
+
+```bash
+npm run db:check:wechat
+npm run profile:check:wechat
+```
+
+第一条命令会确保集合存在；第二条只写入随机 `profile-probe-*` 文档，验证首次写入、读取、更新，并在 `finally` 中删除测试文档。命令不输出昵称头像以外的玩家数据，也不会访问现有玩家资料。部署后还需在微信开发者工具由用户点击资料页刷新按钮，验收真实授权、`PUT /v1/profile`、冷启动 `GET /v1/profile` 和首页头像刷新。

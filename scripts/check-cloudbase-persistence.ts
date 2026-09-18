@@ -21,7 +21,7 @@ const database = app.database({
   database: config.cloudDatabaseName,
 }) as CloudBaseDatabase;
 
-const collectionNames = ["players", "sessions", "cloud_saves", "remote_configs"] as const;
+const collectionNames = ["players", "sessions", "cloud_saves", "remote_configs", "player_profiles"] as const;
 for (const collectionName of collectionNames) {
   await ensureCollection(database, collectionName);
 }
