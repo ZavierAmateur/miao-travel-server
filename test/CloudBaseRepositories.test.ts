@@ -12,6 +12,10 @@ import { CloudBaseSessionRepository } from "../src/infrastructure/repositories/C
 import { CloudBaseCloudSaveRepository } from "../src/infrastructure/repositories/CloudBaseCloudSaveRepository.js";
 import { CloudBaseBootstrapConfigRepository } from "../src/infrastructure/repositories/CloudBaseBootstrapConfigRepository.js";
 import { CloudBasePlayerProfileRepository } from "../src/infrastructure/repositories/CloudBasePlayerProfileRepository.js";
+import {
+  CloudBaseAdminSessionRepository,
+  CloudBaseAdminUserRepository,
+} from "../src/infrastructure/repositories/CloudBaseAdminRepositories.js";
 
 function collectionWithDocument(document: Partial<CloudBaseDocumentReference>) {
   const doc = vi.fn(() => document as CloudBaseDocumentReference);
@@ -131,6 +135,65 @@ describe("CloudBaseSessionRepository", () => {
       createdAt: 100,
       expiresAt: 2_000,
     });
+  });
+});
+
+describe("CloudBaseAdminRepositories", () => {
+  it("管理员查询结果不向后续写入泄漏 CloudBase 只读 _id", async () => {
+    const get = vi.fn().mockResolvedValue({
+      requestId: "admin-user-get",
+      data: [{
+        _id: "cloudbase-admin-id",
+        id: "admin-1",
+        account: "admin",
+        passwordHash: "hash",
+        displayName: "超级管理员",
+        role: "admin",
+        status: "active",
+        createdAt: 100,
+        updatedAt: 100,
+      }],
+    });
+    const set = vi.fn().mockResolvedValue({ requestId: "admin-user-set" });
+    const collection = {
+      doc: vi.fn(() => ({ get, set })),
+      add: vi.fn(),
+      where: vi.fn(() => ({ get, limit: vi.fn(), skip: vi.fn(), orderBy: vi.fn(), update: vi.fn() })),
+    } as unknown as CloudBaseCollectionReference;
+    const repository = new CloudBaseAdminUserRepository(collection);
+
+    const user = await repository.findByAccount("admin");
+    expect(user).not.toHaveProperty("_id");
+    await repository.save({ ...user!, lastLoginAt: 200, updatedAt: 200 });
+    expect(set).toHaveBeenCalledOnce();
+    expect(set.mock.calls[0]?.[0]).not.toHaveProperty("_id");
+  });
+
+  it("管理员会话读取时以查询主键重建模型且丢弃只读 _id", async () => {
+    const get = vi.fn().mockResolvedValue({
+      requestId: "admin-session-get",
+      data: [{
+        _id: "cloudbase-session-id",
+        tokenHash: "stale-token-hash",
+        adminUserId: "admin-1",
+        createdAt: 100,
+        expiresAt: 1_000,
+      }],
+    });
+    const set = vi.fn().mockResolvedValue({ requestId: "admin-session-set" });
+    const { collection } = collectionWithDocument({ get, set });
+    const repository = new CloudBaseAdminSessionRepository(collection);
+
+    const session = await repository.findByTokenHash("trusted-token-hash");
+    expect(session).toEqual({
+      tokenHash: "trusted-token-hash",
+      adminUserId: "admin-1",
+      createdAt: 100,
+      expiresAt: 1_000,
+    });
+    await repository.save({ ...session!, revokedAt: 500 });
+    expect(set).toHaveBeenCalledOnce();
+    expect(set.mock.calls[0]?.[0]).not.toHaveProperty("_id");
   });
 });
 
