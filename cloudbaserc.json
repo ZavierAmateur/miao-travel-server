@@ -1,0 +1,7 @@
+{
+  "envId": "cloud1-d3guut2kr1085b24f",
+  "$schema": "https://static.cloudbase.net/cli/cloudbaserc.schema.json",
+  "cloudrun": {
+    "name": "miao-travel-wechat"
+  }
+}
