@@ -9,6 +9,7 @@ import { PlayerProfileService } from "./domain/profile/PlayerProfileService.js";
 import { loadAdminAuthConfig } from "./config/AdminAuthConfig.js";
 import { AdminAuthService } from "./domain/admin/AdminAuthService.js";
 import { AdminPlayerService } from "./domain/admin/AdminPlayerService.js";
+import { AdminErrorLogService } from "./domain/admin/AdminErrorLogService.js";
 
 const config = loadConfig();
 assertPersistenceReady(config);
@@ -54,13 +55,20 @@ const adminPlayerService = adminAuthService
       audits: persistence.adminAudits,
     })
   : undefined;
+const adminErrorLogService = adminAuthService
+  ? new AdminErrorLogService({
+      auth: adminAuthService,
+      logs: persistence.adminErrorLogs,
+    })
+  : undefined;
 const app = buildApp({
   config,
   platformLoginService,
   cloudSaveService,
   bootstrapConfigService,
   playerProfileService,
-  ...(adminAuthService && adminPlayerService ? { adminAuthService, adminAuthConfig, adminPlayerService } : {}),
+  ...(adminAuthService && adminErrorLogService ? { adminAuthService, adminAuthConfig, adminErrorLogService } : {}),
+  ...(adminPlayerService ? { adminPlayerService } : {}),
 });
 
 const shutdown = async (signal: string): Promise<void> => {

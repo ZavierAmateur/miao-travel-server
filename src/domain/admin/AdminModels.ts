@@ -31,3 +31,15 @@ export interface AdminAuditLog {
   readonly reason?: string;
   readonly metadata?: Readonly<Record<string, string | number | boolean>>;
 }
+
+export interface AdminErrorLog {
+  readonly id: string;
+  readonly occurredAt: number;
+  readonly requestId: string;
+  readonly method: string;
+  readonly path: string;
+  readonly statusCode: number;
+  readonly code: string;
+  readonly message: string;
+  readonly errorName: string;
+}

@@ -16,9 +16,9 @@ import { CloudBaseBootstrapConfigRepository } from "../repositories/CloudBaseBoo
 import type { PlayerProfileRepository } from "../../domain/profile/PlayerProfileRepository.js";
 import { InMemoryPlayerProfileRepository } from "../repositories/InMemoryPlayerProfileRepository.js";
 import { CloudBasePlayerProfileRepository } from "../repositories/CloudBasePlayerProfileRepository.js";
-import type { AdminAuditRepository, AdminSessionRepository, AdminUserRepository } from "../../domain/admin/AdminRepositories.js";
-import { InMemoryAdminAuditRepository, InMemoryAdminSessionRepository, InMemoryAdminUserRepository } from "../repositories/InMemoryAdminRepositories.js";
-import { CloudBaseAdminAuditRepository, CloudBaseAdminSessionRepository, CloudBaseAdminUserRepository } from "../repositories/CloudBaseAdminRepositories.js";
+import type { AdminAuditRepository, AdminErrorLogRepository, AdminSessionRepository, AdminUserRepository } from "../../domain/admin/AdminRepositories.js";
+import { InMemoryAdminAuditRepository, InMemoryAdminErrorLogRepository, InMemoryAdminSessionRepository, InMemoryAdminUserRepository } from "../repositories/InMemoryAdminRepositories.js";
+import { CloudBaseAdminAuditRepository, CloudBaseAdminErrorLogRepository, CloudBaseAdminSessionRepository, CloudBaseAdminUserRepository } from "../repositories/CloudBaseAdminRepositories.js";
 
 export interface Persistence {
   readonly players: PlayerRepository;
@@ -29,6 +29,7 @@ export interface Persistence {
   readonly adminUsers: AdminUserRepository;
   readonly adminSessions: AdminSessionRepository;
   readonly adminAudits: AdminAuditRepository;
+  readonly adminErrorLogs: AdminErrorLogRepository;
   close(): Promise<void>;
 }
 
@@ -43,6 +44,7 @@ export function createPersistence(config: AppConfig): Promise<Persistence> {
       adminUsers: new InMemoryAdminUserRepository(),
       adminSessions: new InMemoryAdminSessionRepository(),
       adminAudits: new InMemoryAdminAuditRepository(),
+      adminErrorLogs: new InMemoryAdminErrorLogRepository(),
       close: () => Promise.resolve(),
     });
   }
@@ -66,6 +68,7 @@ export function createPersistence(config: AppConfig): Promise<Persistence> {
     adminUsers: new CloudBaseAdminUserRepository(database.collection("admin_users")),
     adminSessions: new CloudBaseAdminSessionRepository(database.collection("admin_sessions")),
     adminAudits: new CloudBaseAdminAuditRepository(database.collection("admin_audit_logs")),
+    adminErrorLogs: new CloudBaseAdminErrorLogRepository(database.collection("admin_error_logs")),
     close: () => Promise.resolve(),
   });
 }

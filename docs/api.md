@@ -290,6 +290,30 @@ todayAdReliveCount
 | 409 | `SAVE_ROLLBACK_CONFLICT` | 回滚时当前 revision 已变化 |
 | 403 | `PLAYER_BANNED` | 玩家已被封禁，玩家业务请求被拒绝 |
 
+## 管理端错误日志
+
+错误日志使用管理员 Cookie 会话并要求 `error:read` 权限。日志只保留脱敏后的诊断字段，不返回请求体、查询参数、Cookie、Token、存档正文、平台身份或错误堆栈。
+
+### `GET /admin/v1/errors`
+
+查询参数：`requestId`（完整精确匹配）、`code`（业务错误码精确匹配）、`from`/`to`（毫秒时间戳）、不透明 `cursor` 和 `limit`（1～50，默认 20）。返回 `items` 和 `nextCursor`。
+
+每项包含 `id/occurredAt/requestId/method/path/statusCode/code/message/errorName`。`path` 是不含玩家 ID 和查询参数的接口模板。单次查询最多扫描最近 1000 条记录；低频 V1 后台不提供全文检索和复杂聚合。
+
+### `GET /admin/v1/errors/:errorId`
+
+返回单条脱敏错误详情。日志不存在时返回 HTTP 404 `ERROR_LOG_NOT_FOUND`。
+
+错误码：
+
+| HTTP | code | 说明 |
+|---|---|---|
+| 400 | `INVALID_CURSOR` | 分页游标无效 |
+| 400 | `INVALID_ERROR_QUERY` | 开始时间晚于结束时间 |
+| 401 | `ADMIN_AUTH_REQUIRED` 等 | 管理员会话缺失、失效或过期 |
+| 403 | `ADMIN_PERMISSION_DENIED` | 当前角色缺少 `error:read` |
+| 404 | `ERROR_LOG_NOT_FOUND` | 错误日志不存在 |
+
 ## `GET /v1/profile`
 
 需要 Bearer token。玩家昵称头像与玩法云存档分离，每次登录成功后最多读取一次。资料尚未设置不是错误：

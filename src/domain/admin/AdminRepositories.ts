@@ -1,4 +1,4 @@
-import type { AdminAuditLog, AdminSession, AdminUser } from "./AdminModels.js";
+import type { AdminAuditLog, AdminErrorLog, AdminSession, AdminUser } from "./AdminModels.js";
 
 export interface AdminUserRepository {
   findByAccount(account: string): Promise<AdminUser | undefined>;
@@ -13,4 +13,10 @@ export interface AdminSessionRepository {
 
 export interface AdminAuditRepository {
   append(log: AdminAuditLog): Promise<void>;
+}
+
+export interface AdminErrorLogRepository {
+  append(log: AdminErrorLog): Promise<void>;
+  findById(id: string): Promise<AdminErrorLog | undefined>;
+  listRecent(offset: number, limit: number): Promise<readonly AdminErrorLog[]>;
 }

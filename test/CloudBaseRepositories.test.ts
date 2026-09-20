@@ -13,6 +13,7 @@ import { CloudBaseCloudSaveRepository } from "../src/infrastructure/repositories
 import { CloudBaseBootstrapConfigRepository } from "../src/infrastructure/repositories/CloudBaseBootstrapConfigRepository.js";
 import { CloudBasePlayerProfileRepository } from "../src/infrastructure/repositories/CloudBasePlayerProfileRepository.js";
 import {
+  CloudBaseAdminErrorLogRepository,
   CloudBaseAdminSessionRepository,
   CloudBaseAdminUserRepository,
 } from "../src/infrastructure/repositories/CloudBaseAdminRepositories.js";
@@ -194,6 +195,39 @@ describe("CloudBaseAdminRepositories", () => {
     await repository.save({ ...session!, revokedAt: 500 });
     expect(set).toHaveBeenCalledOnce();
     expect(set.mock.calls[0]?.[0]).not.toHaveProperty("_id");
+  });
+
+  it("错误日志避开 CloudBase 协议保留字段并映射回 API 模型", async () => {
+    const get = vi.fn().mockResolvedValue({
+      requestId: "error-log-get",
+      data: [{
+        id: "error-1",
+        occurredAt: 1_000,
+        requestId: "request-1",
+        method: "PUT",
+        path: "/v1/save",
+        statusCode: 409,
+        errorCode: "SAVE_CONFLICT",
+        safeMessage: "云存档版本冲突",
+        errorName: "CloudSaveConflictError",
+      }],
+    });
+    const set = vi.fn().mockResolvedValue({ requestId: "error-log-set" });
+    const { collection } = collectionWithDocument({ get, set });
+    const repository = new CloudBaseAdminErrorLogRepository(collection);
+
+    await repository.append({
+      id: "error-1", occurredAt: 1_000, requestId: "request-1", method: "PUT", path: "/v1/save",
+      statusCode: 409, code: "SAVE_CONFLICT", message: "云存档版本冲突", errorName: "CloudSaveConflictError",
+    });
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({
+      errorCode: "SAVE_CONFLICT", safeMessage: "云存档版本冲突",
+    }));
+    expect(set.mock.calls[0]?.[0]).not.toHaveProperty("code");
+    expect(set.mock.calls[0]?.[0]).not.toHaveProperty("message");
+    await expect(repository.findById("error-1")).resolves.toMatchObject({
+      code: "SAVE_CONFLICT", message: "云存档版本冲突",
+    });
   });
 });
 

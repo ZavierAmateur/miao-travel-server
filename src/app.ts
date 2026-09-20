@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import type { AppConfig } from "./config/AppConfig.js";
 import { success } from "./contracts/ApiResponse.js";
 import type { PlatformLoginService } from "./domain/auth/PlatformLoginService.js";
@@ -17,6 +17,8 @@ import type { AdminPlayerService } from "./domain/admin/AdminPlayerService.js";
 import { AdminPlayerError } from "./domain/admin/AdminPlayerErrors.js";
 import type { PlatformKind } from "./config/AppConfig.js";
 import type { PlayerStatus } from "./domain/player/Player.js";
+import type { AdminErrorLogService } from "./domain/admin/AdminErrorLogService.js";
+import { AdminErrorLogError } from "./domain/admin/AdminErrorLogErrors.js";
 
 const ADMIN_SESSION_COOKIE = "miao_admin_session";
 
@@ -29,6 +31,7 @@ export interface BuildAppOptions {
   readonly adminAuthService?: AdminAuthService;
   readonly adminAuthConfig?: AdminAuthConfig;
   readonly adminPlayerService?: AdminPlayerService;
+  readonly adminErrorLogService?: AdminErrorLogService;
   readonly now?: () => number;
 }
 
@@ -61,6 +64,41 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         : crypto.randomUUID();
     },
   });
+
+  const respondWithError = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+    descriptor: { readonly statusCode: number; readonly code: string; readonly msg: string; readonly data?: unknown },
+    errorName: string,
+  ): Promise<void> => {
+    const path = request.routeOptions.url || request.url.split("?", 1)[0] || "/";
+    const shouldPersist = !path.startsWith("/admin/v1/errors")
+      && !(path === "/admin/v1/auth/me" && descriptor.code === "ADMIN_AUTH_REQUIRED");
+    if (options.adminErrorLogService && shouldPersist) {
+      try {
+        await options.adminErrorLogService.record({
+          requestId: request.id,
+          method: request.method,
+          path,
+          statusCode: descriptor.statusCode,
+          code: descriptor.code,
+          message: descriptor.msg,
+          errorName,
+        });
+      } catch (logError) {
+        request.log.error({
+          errorName: logError instanceof Error ? logError.name : "UnknownError",
+        }, "错误日志写入失败");
+      }
+    }
+    await reply.code(descriptor.statusCode).send({
+      code: descriptor.code,
+      msg: descriptor.msg,
+      timestamp: now(),
+      requestId: request.id,
+      ...(descriptor.data === undefined ? {} : { data: descriptor.data }),
+    });
+  };
 
   if (options.adminAuthService && options.adminAuthConfig) {
     app.addHook("onRequest", async (request, reply) => {
@@ -261,6 +299,52 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         return success(request.id, result, now());
       });
     }
+
+    if (options.adminErrorLogService) {
+      app.get<{
+        Querystring: { requestId?: string; code?: string; from?: number; to?: number; cursor?: string; limit?: number };
+      }>("/admin/v1/errors", {
+        schema: {
+          querystring: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              requestId: { type: "string", minLength: 1, maxLength: 128 },
+              code: { type: "string", minLength: 1, maxLength: 64 },
+              from: { type: "integer", minimum: 0 },
+              to: { type: "integer", minimum: 0 },
+              cursor: { type: "string", minLength: 1, maxLength: 256 },
+              limit: { type: "integer", minimum: 1, maximum: 50 },
+            },
+          },
+        },
+      }, async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        const result = await options.adminErrorLogService!.list(
+          readAdminCookie(request.headers.cookie),
+          request.query,
+        );
+        return success(request.id, result, now());
+      });
+
+      app.get<{ Params: { errorId: string } }>("/admin/v1/errors/:errorId", {
+        schema: {
+          params: {
+            type: "object",
+            additionalProperties: false,
+            required: ["errorId"],
+            properties: { errorId: { type: "string", minLength: 1, maxLength: 128 } },
+          },
+        },
+      }, async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        const result = await options.adminErrorLogService!.get(
+          readAdminCookie(request.headers.cookie),
+          request.params.errorId,
+        );
+        return success(request.id, result, now());
+      });
+    }
   }
 
   app.get("/health", async (request, reply) => {
@@ -379,88 +463,72 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
   app.setErrorHandler(async (error, request, reply) => {
     if (typeof error === "object" && error !== null && "validation" in error) {
-      await reply.code(400).send({
-        code: "INVALID_REQUEST",
-        msg: "请求参数无效",
-        timestamp: now(),
-        requestId: request.id,
-      });
+      await respondWithError(request, reply, {
+        statusCode: 400, code: "INVALID_REQUEST", msg: "请求参数无效",
+      }, error instanceof Error ? error.name : "ValidationError");
       return;
     }
     if (error instanceof PlatformAuthError) {
       request.log.warn({ platformErrorCode: error.platformErrorCode }, error.message);
-      await reply.code(error.code === "PLATFORM_AUTH_UNAVAILABLE" ? 503 : 401).send({
-        code: error.code,
-        msg: error.message,
-        timestamp: now(),
-        requestId: request.id,
-      });
+      await respondWithError(request, reply, {
+        statusCode: error.code === "PLATFORM_AUTH_UNAVAILABLE" ? 503 : 401,
+        code: error.code, msg: error.message,
+      }, error.name);
       return;
     }
     if (error instanceof SessionAuthenticationError) {
-      await reply.code(error.code === "PLAYER_BANNED" ? 403 : 401).send({
-        code: error.code,
-        msg: error.message,
-        timestamp: now(),
-        requestId: request.id,
-      });
+      await respondWithError(request, reply, {
+        statusCode: error.code === "PLAYER_BANNED" ? 403 : 401,
+        code: error.code, msg: error.message,
+      }, error.name);
       return;
     }
     if (error instanceof CloudSaveValidationError) {
-      await reply.code(error.code === "SAVE_TOO_LARGE" ? 413 : 400).send({
-        code: error.code,
-        msg: error.message,
-        timestamp: now(),
-        requestId: request.id,
-      });
+      await respondWithError(request, reply, {
+        statusCode: error.code === "SAVE_TOO_LARGE" ? 413 : 400,
+        code: error.code, msg: error.message,
+      }, error.name);
       return;
     }
     if (error instanceof CloudSaveConflictError) {
-      await reply.code(409).send({
+      await respondWithError(request, reply, {
+        statusCode: 409,
         code: "SAVE_CONFLICT",
         msg: error.message,
-        timestamp: now(),
-        requestId: request.id,
         ...(error.current ? { data: { current: error.current } } : {}),
-      });
+      }, error.name);
       return;
     }
     if (error instanceof PlayerProfileValidationError) {
-      await reply.code(400).send({
-        code: error.code,
-        msg: error.message,
-        timestamp: now(),
-        requestId: request.id,
-      });
+      await respondWithError(request, reply, {
+        statusCode: 400, code: error.code, msg: error.message,
+      }, error.name);
       return;
     }
     if (error instanceof AdminAuthError) {
-      await reply.code(error.statusCode).send({
-        code: error.code,
-        msg: error.message,
-        timestamp: now(),
-        requestId: request.id,
-      });
+      await respondWithError(request, reply, {
+        statusCode: error.statusCode, code: error.code, msg: error.message,
+      }, error.name);
       return;
     }
     if (error instanceof AdminPlayerError) {
-      await reply.code(error.statusCode).send({
-        code: error.code,
-        msg: error.message,
-        timestamp: now(),
-        requestId: request.id,
-      });
+      await respondWithError(request, reply, {
+        statusCode: error.statusCode, code: error.code, msg: error.message,
+      }, error.name);
+      return;
+    }
+    if (error instanceof AdminErrorLogError) {
+      await respondWithError(request, reply, {
+        statusCode: error.statusCode, code: error.code, msg: error.message,
+      }, error.name);
       return;
     }
     request.log.error({
       errorName: error instanceof Error ? error.name : "UnknownError",
     }, "请求处理失败");
-    await reply.code(500).send({
-      code: "INTERNAL_ERROR",
-      msg: "服务器内部错误",
-      timestamp: now(),
-      requestId: request.id,
-    });
+    await respondWithError(request, reply, {
+      statusCode: 500, code: "INTERNAL_ERROR", msg: "服务器内部错误",
+    }, error instanceof Error ? error.name : "UnknownError");
   });
 
   return app;

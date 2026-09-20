@@ -50,6 +50,8 @@ ADMIN_WEB_ORIGIN=http://127.0.0.1:5173
 
 首次启动会创建初始超管；已存在同账号时不会用环境变量覆盖密码。生产初始密码必须存入云端 Secret，创建完成后应按后续密码轮换流程移除或轮换。
 
+V1 管理后台的错误日志使用 `admin_error_logs` 集合，只保存脱敏后的时间、requestId、接口模板、HTTP 状态、业务错误码和安全提示信息，不保存请求体、Cookie、Token、存档正文或错误堆栈。运行 `npm run db:check:wechat` 会自动检查并在缺失时创建该集合；运行 `npm run error-log:check:wechat` 会执行可回收的真实写入、详情读取和时间倒序列表探测。
+
 ## CloudBase Run 部署
 
 仓库根目录已经提供生产用多阶段 `Dockerfile` 和 `.dockerignore`。微信首次云端部署的服务参数、环境变量与验收步骤见：`docs/deployment/CloudBase-Run微信部署说明.md`。

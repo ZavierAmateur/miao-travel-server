@@ -20,6 +20,7 @@
     "save:check": "node --env-file-if-exists=.env --import tsx scripts/check-cloud-save.ts",
     "save:check:wechat": "node --env-file=.env.wechat.local --import tsx scripts/check-cloud-save.ts",
     "profile:check:wechat": "node --env-file=.env.wechat.local --import tsx scripts/check-player-profile.ts",
+    "error-log:check:wechat": "node --env-file=.env.wechat.local --import tsx scripts/check-admin-error-logs.ts",
     "bootstrap:publish:wechat": "node --env-file=.env.wechat.local --import tsx scripts/publish-bootstrap-config.ts"
   },
   "dependencies": {
