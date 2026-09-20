@@ -66,10 +66,15 @@ describe("管理端玩家查询 API", () => {
 
   afterEach(async () => app?.close());
 
-  it("按条件查询玩家并只返回存档摘要", async () => {
+  it("按条件查询玩家并返回资料与存档摘要", async () => {
     const response = await app!.inject({ method: "GET", url: "/admin/v1/players?platform=wechat&status=active", headers: { cookie } });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({ data: { items: [{ id: "player-1", save: { revision: 2, clientVersion: "1.3.0" } }], nextCursor: null } });
+    expect(response.json()).toMatchObject({ data: { items: [{
+      id: "player-1",
+      createdAt: 1_000,
+      profile: { nickName: "旅行猫", avatarUrl: "https://example.com/avatar.png", updatedAt: 2_100 },
+      save: { revision: 2, clientVersion: "1.3.0" },
+    }], nextCursor: null } });
     expect(response.body).not.toContain("secret-open-id");
     expect(response.body).not.toContain("modules");
   });

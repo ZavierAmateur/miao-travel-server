@@ -255,7 +255,7 @@ todayAdReliveCount
 
 查询参数：`playerId`（完整 ID 精确匹配）、`platform=wechat|bytedance`、`status=active|banned`、不透明 `cursor` 和 `limit`（1～50，默认 20）。返回 `items` 和下一页 `nextCursor`；没有下一页时为 `null`。
 
-每项包含 `id/platform/status/createdAt/lastLoginAt`，有云存档时额外给出 `revision/clientVersion/clientSavedAt/serverSavedAt/sizeBytes` 摘要。玩家列表不加载昵称或头像。
+每项包含 `id/platform/status/createdAt/lastLoginAt`，主动同步过微信资料时返回 `profile.nickName/avatarUrl/updatedAt` 摘要，否则 `profile=null`；有云存档时额外给出 `revision/clientVersion/clientSavedAt/serverSavedAt/sizeBytes` 摘要。列表不返回平台身份或云存档正文。
 
 ### `GET /admin/v1/players/:playerId`
 

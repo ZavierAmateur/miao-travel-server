@@ -204,13 +204,21 @@ export class AdminPlayerService {
   }
 
   private async toListItem(player: Awaited<ReturnType<PlayerRepository["findById"]>> & {}) {
-    const save = await this.options.saves.findByPlayerId(player.id);
+    const [profile, save] = await Promise.all([
+      this.options.profiles.findByPlayerId(player.id),
+      this.options.saves.findByPlayerId(player.id),
+    ]);
     return {
       id: player.id,
       platform: player.platform,
       status: player.status,
       createdAt: player.createdAt,
       lastLoginAt: player.lastLoginAt,
+      profile: profile ? {
+        nickName: profile.nickName,
+        avatarUrl: profile.avatarUrl,
+        updatedAt: profile.updatedAt,
+      } : null,
       save: save ? toSaveSummary(save) : null,
     };
   }
