@@ -134,4 +134,37 @@ describe("公告 API", () => {
     expect(created.body).toContain("<strong><u");
     expect(created.body).toContain("安全正文");
   });
+
+  it("允许本机浏览器预览跨域读取公共公告但不开放任意来源", async () => {
+    const previewOrigin = "http://localhost:7456";
+    const preflight = await app!.inject({
+      method: "OPTIONS",
+      url: "/v1/announcements?platform=wechat&page=1&pageSize=20",
+      headers: {
+        origin: previewOrigin,
+        "access-control-request-method": "GET",
+        "access-control-request-headers": "content-type,x-client-version",
+      },
+    });
+    expect(preflight.statusCode).toBe(204);
+    expect(preflight.headers["access-control-allow-origin"]).toBe(previewOrigin);
+    expect(preflight.headers["access-control-allow-methods"]).toBe("GET,OPTIONS");
+    expect(preflight.headers["access-control-allow-headers"]).toBe("Content-Type,X-Client-Version");
+
+    const previewGet = await app!.inject({
+      method: "GET",
+      url: "/v1/announcements?platform=wechat&page=1&pageSize=20",
+      headers: { origin: "http://127.0.0.1:7456", "x-client-version": "1.0.0" },
+    });
+    expect(previewGet.statusCode).toBe(200);
+    expect(previewGet.headers["access-control-allow-origin"]).toBe("http://127.0.0.1:7456");
+
+    const untrusted = await app!.inject({
+      method: "GET",
+      url: "/v1/announcements?platform=wechat&page=1&pageSize=20",
+      headers: { origin: "https://evil.example" },
+    });
+    expect(untrusted.statusCode).toBe(200);
+    expect(untrusted.headers["access-control-allow-origin"]).toBeUndefined();
+  });
 });

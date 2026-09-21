@@ -77,6 +77,18 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     limits: { files: 1, fields: 2, fileSize: MAX_UPLOAD_BYTES },
   });
 
+  app.addHook("onRequest", async (request, reply) => {
+    const path = request.url.split("?", 1)[0] || "/";
+    if (path !== "/v1/announcements" && !path.startsWith("/v1/announcements/")) return;
+    const origin = request.headers.origin;
+    if (!origin || !isAllowedGamePreviewOrigin(origin)) return;
+    reply.header("access-control-allow-origin", origin);
+    reply.header("access-control-allow-methods", "GET,OPTIONS");
+    reply.header("access-control-allow-headers", "Content-Type,X-Client-Version");
+    reply.header("vary", "Origin");
+    if (request.method === "OPTIONS") await reply.code(204).send();
+  });
+
   const respondWithError = async (
     request: FastifyRequest,
     reply: FastifyReply,
@@ -768,6 +780,16 @@ function isAllowedAdminOrigin(origin: string | undefined, configuredOrigin: stri
       && actual.port === configured.port
       && loopbackHosts.has(actual.hostname)
       && loopbackHosts.has(configured.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function isAllowedGamePreviewOrigin(origin: string): boolean {
+  try {
+    const parsed = new URL(origin);
+    const loopbackHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
+    return parsed.protocol === "http:" && loopbackHosts.has(parsed.hostname);
   } catch {
     return false;
   }
