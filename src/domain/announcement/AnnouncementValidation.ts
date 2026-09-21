@@ -55,7 +55,7 @@ export function validateAnnouncementInput(input: PutAnnouncementInput): PutAnnou
 export function sanitizeAnnouncementHtml(value: string): string {
   return sanitizeHtml(value, {
     allowedTags: ["p", "br", "strong", "b", "em", "i", "u", "s", "ul", "ol", "li", "blockquote", "h1", "h2", "h3", "span"],
-    allowedAttributes: { p: ["style"], span: ["style"] },
+    allowedAttributes: { "*": ["style"] },
     allowedStyles: {
       "*": {
         color: [/^#[0-9a-fA-F]{3,8}$/, /^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/],

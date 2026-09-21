@@ -119,12 +119,19 @@ describe("公告 API", () => {
 
     const created = await app!.inject({
       method: "POST", url: "/admin/v1/announcements", headers: { cookie },
-      payload: { ...validPayload, contentHtml: "<script>alert(1)</script><p onclick=\"hack()\">安全正文</p><img src=x>" },
+      payload: {
+        ...validPayload,
+        contentHtml: "<script>alert(1)</script><p onclick=\"hack()\">安全正文<strong><u style=\"color:rgb(245, 108, 108);font-size:18px;position:fixed\">彩色重点</u></strong></p><img src=x>",
+      },
     });
     expect(created.statusCode).toBe(201);
     expect(created.body).not.toContain("<script");
     expect(created.body).not.toContain("onclick");
     expect(created.body).not.toContain("<img");
+    expect(created.body).not.toContain("position");
+    expect(created.body).toContain("color:rgb(245, 108, 108)");
+    expect(created.body).toContain("font-size:18px");
+    expect(created.body).toContain("<strong><u");
     expect(created.body).toContain("安全正文");
   });
 });
