@@ -10,6 +10,10 @@ import { loadAdminAuthConfig } from "./config/AdminAuthConfig.js";
 import { AdminAuthService } from "./domain/admin/AdminAuthService.js";
 import { AdminPlayerService } from "./domain/admin/AdminPlayerService.js";
 import { AdminErrorLogService } from "./domain/admin/AdminErrorLogService.js";
+import { AnnouncementService } from "./domain/announcement/AnnouncementService.js";
+import { loadCosStorageConfig } from "./config/CosStorageConfig.js";
+import { AdminFileService } from "./domain/file/AdminFileService.js";
+import { CosFileStorage } from "./infrastructure/storage/CosFileStorage.js";
 
 const config = loadConfig();
 assertPersistenceReady(config);
@@ -61,14 +65,29 @@ const adminErrorLogService = adminAuthService
       logs: persistence.adminErrorLogs,
     })
   : undefined;
+const announcementService = new AnnouncementService({
+  repository: persistence.announcements,
+  ...(adminAuthService ? { auth: adminAuthService, audits: persistence.adminAudits } : {}),
+});
+const cosStorageConfig = loadCosStorageConfig();
+const adminFileService = adminAuthService
+  ? new AdminFileService({
+      auth: adminAuthService,
+      audits: persistence.adminAudits,
+      storageConfig: cosStorageConfig,
+      ...(cosStorageConfig.enabled ? { storage: new CosFileStorage(cosStorageConfig) } : {}),
+    })
+  : undefined;
 const app = buildApp({
   config,
   platformLoginService,
   cloudSaveService,
   bootstrapConfigService,
   playerProfileService,
+  announcementService,
   ...(adminAuthService && adminErrorLogService ? { adminAuthService, adminAuthConfig, adminErrorLogService } : {}),
   ...(adminPlayerService ? { adminPlayerService } : {}),
+  ...(adminFileService ? { adminFileService } : {}),
 });
 
 const shutdown = async (signal: string): Promise<void> => {

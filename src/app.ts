@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
+import multipart from "@fastify/multipart";
 import type { AppConfig } from "./config/AppConfig.js";
 import { success } from "./contracts/ApiResponse.js";
 import type { PlatformLoginService } from "./domain/auth/PlatformLoginService.js";
@@ -19,6 +20,12 @@ import type { PlatformKind } from "./config/AppConfig.js";
 import type { PlayerStatus } from "./domain/player/Player.js";
 import type { AdminErrorLogService } from "./domain/admin/AdminErrorLogService.js";
 import { AdminErrorLogError } from "./domain/admin/AdminErrorLogErrors.js";
+import type { AnnouncementService } from "./domain/announcement/AnnouncementService.js";
+import type { PutAnnouncementInput } from "./domain/announcement/Announcement.js";
+import { AnnouncementError } from "./domain/announcement/AnnouncementErrors.js";
+import type { AdminFileService } from "./domain/file/AdminFileService.js";
+import { MAX_UPLOAD_BYTES } from "./domain/file/AdminFileService.js";
+import { AdminFileError } from "./domain/file/AdminFileErrors.js";
 
 const ADMIN_SESSION_COOKIE = "miao_admin_session";
 
@@ -32,6 +39,8 @@ export interface BuildAppOptions {
   readonly adminAuthConfig?: AdminAuthConfig;
   readonly adminPlayerService?: AdminPlayerService;
   readonly adminErrorLogService?: AdminErrorLogService;
+  readonly announcementService?: AnnouncementService;
+  readonly adminFileService?: AdminFileService;
   readonly now?: () => number;
 }
 
@@ -63,6 +72,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         ? incoming
         : crypto.randomUUID();
     },
+  });
+  void app.register(multipart, {
+    limits: { files: 1, fields: 2, fileSize: MAX_UPLOAD_BYTES },
   });
 
   const respondWithError = async (
@@ -124,7 +136,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         return;
       }
       if (request.method === "OPTIONS") {
-        reply.header("access-control-allow-methods", "GET,POST,OPTIONS");
+        reply.header("access-control-allow-methods", "GET,POST,PUT,DELETE,OPTIONS");
         reply.header("access-control-allow-headers", "Content-Type,X-Request-Id");
         await reply.code(204).send();
       }
@@ -345,6 +357,91 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         return success(request.id, result, now());
       });
     }
+
+    if (options.announcementService) {
+      app.get<{
+        Querystring: { page?: number; pageSize?: number; status?: "draft" | "published"; platform?: PlatformKind; keyword?: string };
+      }>("/admin/v1/announcements", {
+        schema: { querystring: adminAnnouncementListQuerySchema },
+      }, async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        const result = await options.announcementService!.listAdmin(
+          readAdminCookie(request.headers.cookie), request.query,
+        );
+        return success(request.id, result, now());
+      });
+
+      app.get<{ Params: { announcementId: string } }>("/admin/v1/announcements/:announcementId", {
+        schema: { params: announcementIdParamsSchema },
+      }, async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        const result = await options.announcementService!.getAdmin(
+          readAdminCookie(request.headers.cookie), request.params.announcementId,
+        );
+        return success(request.id, result, now());
+      });
+
+      app.post<{ Body: PutAnnouncementInput }>("/admin/v1/announcements", {
+        bodyLimit: 64 * 1024,
+        schema: { body: announcementBodySchema },
+      }, async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        const result = await options.announcementService!.create(
+          readAdminCookie(request.headers.cookie), request.body,
+          { requestId: request.id, ip: request.ip },
+        );
+        return reply.code(201).send(success(request.id, result, now()));
+      });
+
+      app.put<{ Params: { announcementId: string }; Body: PutAnnouncementInput }>(
+        "/admin/v1/announcements/:announcementId",
+        { bodyLimit: 64 * 1024, schema: { params: announcementIdParamsSchema, body: announcementBodySchema } },
+        async (request, reply) => {
+          reply.header("cache-control", "no-store");
+          const result = await options.announcementService!.update(
+            readAdminCookie(request.headers.cookie), request.params.announcementId, request.body,
+            { requestId: request.id, ip: request.ip },
+          );
+          return success(request.id, result, now());
+        },
+      );
+
+      app.delete<{ Params: { announcementId: string } }>("/admin/v1/announcements/:announcementId", {
+        schema: { params: announcementIdParamsSchema },
+      }, async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        const result = await options.announcementService!.delete(
+          readAdminCookie(request.headers.cookie), request.params.announcementId,
+          { requestId: request.id, ip: request.ip },
+        );
+        return success(request.id, result, now());
+      });
+    }
+
+    if (options.adminFileService) {
+      app.post("/admin/v1/files/upload", async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        if (!request.isMultipart()) throw new AdminFileError("INVALID_UPLOAD", "请使用 multipart/form-data 上传文件", 400);
+        let file;
+        try {
+          file = await request.file({ limits: { files: 1, fields: 2, fileSize: MAX_UPLOAD_BYTES } });
+        } catch {
+          throw new AdminFileError("FILE_TOO_LARGE", "上传文件不能超过 5MB", 413);
+        }
+        if (!file) throw new AdminFileError("FILE_REQUIRED", "请选择要上传的文件", 400);
+        let body: Buffer;
+        try {
+          body = await file.toBuffer();
+        } catch {
+          throw new AdminFileError("FILE_TOO_LARGE", "上传文件不能超过 5MB", 413);
+        }
+        const result = await options.adminFileService!.upload(
+          readAdminCookie(request.headers.cookie), { filename: file.filename, body },
+          { requestId: request.id, ip: request.ip },
+        );
+        return success(request.id, result, now());
+      });
+    }
   }
 
   app.get("/health", async (request, reply) => {
@@ -368,6 +465,29 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         return reply.code(304).send();
       }
       return success(request.id, result.data, now());
+    });
+  }
+
+  if (options.announcementService) {
+    app.get<{
+      Querystring: { platform: PlatformKind; page?: number; pageSize?: number };
+    }>("/v1/announcements", {
+      schema: { querystring: publicAnnouncementListQuerySchema },
+    }, async (request, reply) => {
+      reply.header("cache-control", "public, max-age=60");
+      const result = await options.announcementService!.listPublic(request.query);
+      return success(request.id, result, now());
+    });
+
+    app.get<{
+      Params: { announcementId: string };
+      Querystring: { platform: PlatformKind };
+    }>("/v1/announcements/:announcementId", {
+      schema: { params: announcementIdParamsSchema, querystring: publicAnnouncementDetailQuerySchema },
+    }, async (request, reply) => {
+      reply.header("cache-control", "public, max-age=60");
+      const result = await options.announcementService!.getPublic(request.params.announcementId, request.query.platform);
+      return success(request.id, result, now());
     });
   }
 
@@ -523,6 +643,18 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       }, error.name);
       return;
     }
+    if (error instanceof AnnouncementError) {
+      await respondWithError(request, reply, {
+        statusCode: error.statusCode, code: error.code, msg: error.message,
+      }, error.name);
+      return;
+    }
+    if (error instanceof AdminFileError) {
+      await respondWithError(request, reply, {
+        statusCode: error.statusCode, code: error.code, msg: error.message,
+      }, error.name);
+      return;
+    }
     request.log.error({
       errorName: error instanceof Error ? error.name : "UnknownError",
     }, "请求处理失败");
@@ -539,6 +671,74 @@ const playerIdParamsSchema = {
   additionalProperties: false,
   required: ["playerId"],
   properties: { playerId: { type: "string", minLength: 1, maxLength: 128 } },
+} as const;
+
+const announcementIdParamsSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["announcementId"],
+  properties: { announcementId: { type: "string", minLength: 1, maxLength: 128 } },
+} as const;
+
+const publicAnnouncementListQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["platform"],
+  properties: {
+    platform: { type: "string", enum: ["wechat", "bytedance"] },
+    page: { type: "integer", minimum: 1 },
+    pageSize: { type: "integer", minimum: 1, maximum: 50 },
+  },
+} as const;
+
+const publicAnnouncementDetailQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["platform"],
+  properties: { platform: { type: "string", enum: ["wechat", "bytedance"] } },
+} as const;
+
+const adminAnnouncementListQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    page: { type: "integer", minimum: 1 },
+    pageSize: { type: "integer", minimum: 1, maximum: 50 },
+    status: { type: "string", enum: ["draft", "published"] },
+    platform: { type: "string", enum: ["wechat", "bytedance"] },
+    keyword: { type: "string", maxLength: 100 },
+  },
+} as const;
+
+const announcementBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["title", "contentHtml", "images", "status", "platforms", "sortOrder", "autoPopup", "startsAt", "endsAt"],
+  properties: {
+    title: { type: "string", minLength: 1, maxLength: 100 },
+    contentHtml: { type: "string", minLength: 1, maxLength: 30_000 },
+    images: {
+      type: "array",
+      maxItems: 9,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["fileId", "objectKey", "url", "alt"],
+        properties: {
+          fileId: { type: "string", minLength: 1, maxLength: 128 },
+          objectKey: { type: "string", minLength: 1, maxLength: 512 },
+          url: { type: "string", minLength: 1, maxLength: 2_048 },
+          alt: { type: "string", maxLength: 200 },
+        },
+      },
+    },
+    status: { type: "string", enum: ["draft", "published"] },
+    platforms: { type: "array", minItems: 1, maxItems: 2, uniqueItems: true, items: { type: "string", enum: ["wechat", "bytedance"] } },
+    sortOrder: { type: "integer", minimum: -100_000, maximum: 100_000 },
+    autoPopup: { type: "boolean" },
+    startsAt: { type: "integer", minimum: 0 },
+    endsAt: { type: "integer", minimum: 0 },
+  },
 } as const;
 
 function readAdminCookie(cookieHeader?: string): string | undefined {

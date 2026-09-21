@@ -290,6 +290,74 @@ todayAdReliveCount
 | 409 | `SAVE_ROLLBACK_CONFLICT` | 回滚时当前 revision 已变化 |
 | 403 | `PLAYER_BANNED` | 玩家已被封禁，玩家业务请求被拒绝 |
 
+## 公告
+
+公告独立于 `/v1/bootstrap-config`，列表与详情分别请求。时间均为 UTC Unix 毫秒；`startsAt=0` 表示立即开始，`endsAt=0` 表示不自动结束。
+
+### `GET /v1/announcements`
+
+无需鉴权。查询参数：`platform=wechat|bytedance`（必填）、`page`、`pageSize`（1～50，默认 20）。只返回当前时间可见、当前平台已发布的公告。
+
+返回 `items/page/pageSize/total`。列表项为 `id/title/summary/imageCount/autoPopup/startsAt/endsAt/updatedAt`，不返回完整富文本和图片列表。
+
+### `GET /v1/announcements/:announcementId`
+
+无需鉴权，查询参数 `platform` 必填。返回 `id/title/contentHtml/images/autoPopup/startsAt/endsAt/updatedAt`。`images` 按数组顺序在富文本下方展示，每项为 `fileId/objectKey/url/alt`。草稿、未到开始时间、已结束或不属于当前平台的公告统一返回 404。
+
+### 管理端公告 CRUD
+
+以下接口使用管理员 Cookie。列表和详情要求 `config:read`，新增、更新、删除要求 `config:write`：
+
+- `GET /admin/v1/announcements`：支持 `page/pageSize/status/platform/keyword`。
+- `GET /admin/v1/announcements/:announcementId`：获取完整编辑数据。
+- `POST /admin/v1/announcements`：新增并返回公告，HTTP 201。
+- `PUT /admin/v1/announcements/:announcementId`：全量更新公告。
+- `DELETE /admin/v1/announcements/:announcementId`：删除公告。
+
+新增和更新请求体：
+
+```json
+{
+  "title": "国庆旅行活动",
+  "contentHtml": "<p>欢迎旅行！</p>",
+  "images": [
+    {
+      "fileId": "上传接口返回的文件 ID",
+      "objectKey": "uploads/2026/09/example.webp",
+      "url": "https://静态资源域名/uploads/2026/09/example.webp",
+      "alt": "活动海报"
+    }
+  ],
+  "status": "published",
+  "platforms": ["wechat"],
+  "sortOrder": 10,
+  "autoPopup": true,
+  "startsAt": 0,
+  "endsAt": 0
+}
+```
+
+富文本会在服务端清理，只允许基础段落、标题、列表、引用和少量文本样式；正文内不允许 `<img>`，图片统一放在 `images`。公告不包含 revision、minimumClientVersion、maximumClientVersion。
+
+## `POST /admin/v1/files/upload`
+
+通用服务端文件上传接口，使用管理员 Cookie 并要求 `config:write`。请求为 `multipart/form-data`，文件字段名为 `file`。当前允许 JPEG、PNG、WebP，按文件头识别，单文件最大 5MB。
+
+成功数据：
+
+```json
+{
+  "fileId": "服务端文件 ID",
+  "objectKey": "uploads/2026/09/example.webp",
+  "url": "https://静态资源域名/uploads/2026/09/example.webp",
+  "originalName": "海报.webp",
+  "contentType": "image/webp",
+  "sizeBytes": 12345
+}
+```
+
+服务器使用 COS 密钥上传，前端不接触密钥。公告编辑器只保存返回的文件引用。存储未配置返回 `FILE_STORAGE_UNAVAILABLE`，类型不支持返回 `UNSUPPORTED_FILE_TYPE`，超过限制返回 `FILE_TOO_LARGE`。
+
 ## 管理端错误日志
 
 错误日志使用管理员 Cookie 会话并要求 `error:read` 权限。日志只保留脱敏后的诊断字段，不返回请求体、查询参数、Cookie、Token、存档正文、平台身份或错误堆栈。

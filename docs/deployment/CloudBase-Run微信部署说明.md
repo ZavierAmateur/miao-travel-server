@@ -40,6 +40,11 @@
 | `CLOUDBASE_API_KEY` / `CLOUDBASE_APIKEY` / `TCB_API_KEY` | 服务端 API Key，三者只需一个；优先使用控制台“API Key 设置”的托管注入变量名 |
 | `CLOUDBASE_DATABASE_INSTANCE` | `(default)` |
 | `CLOUDBASE_DATABASE_NAME` | `(default)` |
+| `COS_SECRET_ID` | 腾讯云 API 密钥 ID，使用 Secret 管理 |
+| `COS_SECRET_KEY` | 腾讯云 API 密钥 Key，使用 Secret 管理 |
+| `COS_BUCKET` | `miao-1487859276` |
+| `COS_REGION` | `ap-guangzhou` |
+| `COS_PUBLIC_BASE_URL` | `https://miao-1487859276.cos.ap-guangzhou.myqcloud.com`；以后绑定自定义 HTTPS 域名时替换 |
 
 聊天中曾出现过 AppSecret。正式上线前先在微信公众平台轮换，再把新值写入 CloudBase Secret；旧值不得继续用于正式环境。
 
@@ -108,3 +113,9 @@ npm run profile:check:wechat
 ```
 
 第一条命令会确保集合存在；第二条只写入随机 `profile-probe-*` 文档，验证首次写入、读取、更新，并在 `finally` 中删除测试文档。命令不输出昵称头像以外的玩家数据，也不会访问现有玩家资料。部署后还需在微信开发者工具由用户点击资料页刷新按钮，验收真实授权、`PUT /v1/profile`、冷启动 `GET /v1/profile` 和首页头像刷新。
+
+## 9. 公告和 COS 上传
+
+公告阶段新增 `announcements` 集合，部署前运行 `npm run db:check:wechat` 会在缺失时创建。通用上传接口由服务器使用 `COS_SECRET_ID/COS_SECRET_KEY` 写入 COS；密钥不得配置在管理后台或小游戏前端。存储桶保持“公有读、私有写”，并给该服务端密钥配置尽量小的对象上传权限。
+
+COS 默认域名可以先用于接口联调。控制台已经提示 2024 年以后创建的存储桶默认域名可能不能直接在浏览器预览，正式展示前应绑定自定义 HTTPS 或 CDN 域名，并把 `COS_PUBLIC_BASE_URL` 更新为该域名；公告数据结构和接口不需要调整。

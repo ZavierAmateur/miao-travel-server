@@ -52,6 +52,22 @@ ADMIN_WEB_ORIGIN=http://127.0.0.1:5173
 
 V1 管理后台的错误日志使用 `admin_error_logs` 集合，只保存脱敏后的时间、requestId、接口模板、HTTP 状态、业务错误码和安全提示信息，不保存请求体、Cookie、Token、存档正文或错误堆栈。运行 `npm run db:check:wechat` 会自动检查并在缺失时创建该集合；运行 `npm run error-log:check:wechat` 会执行可回收的真实写入、详情读取和时间倒序列表探测。
 
+## 公告与通用文件上传
+
+公告独立使用 `announcements` 集合，不塞入启动配置。公共端提供分页列表和详情，管理端提供查询、新增、更新、删除；富文本正文与图片列表分开保存，图片由客户端在正文下方依次展示。公告不包含 revision、minimumClientVersion、maximumClientVersion。
+
+后台图片先调用 `POST /admin/v1/files/upload` 上传到腾讯云 COS，再把返回的 `fileId/objectKey/url` 写入公告图片列表。COS 密钥只配置在后端：
+
+```bash
+COS_SECRET_ID=腾讯云API密钥ID
+COS_SECRET_KEY=腾讯云API密钥Key
+COS_BUCKET=miao-1487859276
+COS_REGION=ap-guangzhou
+COS_PUBLIC_BASE_URL=https://miao-1487859276.cos.ap-guangzhou.myqcloud.com
+```
+
+当前通用上传接口限制为 JPEG、PNG、WebP，单文件最大 5MB；接口使用管理员 HttpOnly Cookie 鉴权，浏览器不持有 COS 密钥。
+
 ## CloudBase Run 部署
 
 仓库根目录已经提供生产用多阶段 `Dockerfile` 和 `.dockerignore`。微信首次云端部署的服务参数、环境变量与验收步骤见：`docs/deployment/CloudBase-Run微信部署说明.md`。

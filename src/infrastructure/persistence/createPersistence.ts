@@ -19,6 +19,9 @@ import { CloudBasePlayerProfileRepository } from "../repositories/CloudBasePlaye
 import type { AdminAuditRepository, AdminErrorLogRepository, AdminSessionRepository, AdminUserRepository } from "../../domain/admin/AdminRepositories.js";
 import { InMemoryAdminAuditRepository, InMemoryAdminErrorLogRepository, InMemoryAdminSessionRepository, InMemoryAdminUserRepository } from "../repositories/InMemoryAdminRepositories.js";
 import { CloudBaseAdminAuditRepository, CloudBaseAdminErrorLogRepository, CloudBaseAdminSessionRepository, CloudBaseAdminUserRepository } from "../repositories/CloudBaseAdminRepositories.js";
+import type { AnnouncementRepository } from "../../domain/announcement/AnnouncementRepository.js";
+import { InMemoryAnnouncementRepository } from "../repositories/InMemoryAnnouncementRepository.js";
+import { CloudBaseAnnouncementRepository } from "../repositories/CloudBaseAnnouncementRepository.js";
 
 export interface Persistence {
   readonly players: PlayerRepository;
@@ -30,6 +33,7 @@ export interface Persistence {
   readonly adminSessions: AdminSessionRepository;
   readonly adminAudits: AdminAuditRepository;
   readonly adminErrorLogs: AdminErrorLogRepository;
+  readonly announcements: AnnouncementRepository;
   close(): Promise<void>;
 }
 
@@ -45,6 +49,7 @@ export function createPersistence(config: AppConfig): Promise<Persistence> {
       adminSessions: new InMemoryAdminSessionRepository(),
       adminAudits: new InMemoryAdminAuditRepository(),
       adminErrorLogs: new InMemoryAdminErrorLogRepository(),
+      announcements: new InMemoryAnnouncementRepository(),
       close: () => Promise.resolve(),
     });
   }
@@ -69,6 +74,7 @@ export function createPersistence(config: AppConfig): Promise<Persistence> {
     adminSessions: new CloudBaseAdminSessionRepository(database.collection("admin_sessions")),
     adminAudits: new CloudBaseAdminAuditRepository(database.collection("admin_audit_logs")),
     adminErrorLogs: new CloudBaseAdminErrorLogRepository(database.collection("admin_error_logs")),
+    announcements: new CloudBaseAnnouncementRepository(database.collection("announcements")),
     close: () => Promise.resolve(),
   });
 }
