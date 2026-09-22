@@ -25,4 +25,13 @@ export interface UpsertLevelScoreCommand {
 export interface LevelLeaderboardListQuery {
   readonly offset: number;
   readonly limit: number;
+  readonly playerId?: string;
+  readonly platform?: PlatformKind;
+  readonly nickName?: string;
+}
+
+export interface RankedLevelLeaderboardEntry {
+  readonly entry: LevelLeaderboardEntry;
+  /** 未筛选全榜中的真实名次。 */
+  readonly rank: number;
 }

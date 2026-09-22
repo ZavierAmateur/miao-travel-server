@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { createHash } from "node:crypto";
 import { buildApp } from "../src/app.js";
@@ -15,6 +15,8 @@ import { InMemorySessionRepository } from "../src/infrastructure/repositories/In
 import { InMemoryCloudSaveRepository } from "../src/infrastructure/repositories/InMemoryCloudSaveRepository.js";
 import { CloudSaveService } from "../src/domain/save/CloudSaveService.js";
 import { PlayerProfileService } from "../src/domain/profile/PlayerProfileService.js";
+import { CloudBaseLevelLeaderboardRepository } from "../src/infrastructure/repositories/CloudBaseLevelLeaderboardRepository.js";
+import type { CloudBaseCollectionReference, CloudBaseQueryReference } from "../src/infrastructure/persistence/CloudBaseDatabase.js";
 
 const config: AppConfig = {
   environment: AppEnvironment.Test, host: "127.0.0.1", port: 3000,
@@ -47,7 +49,7 @@ describe("管理端闯关榜 API", () => {
     for (let index = 0; index < 25; index += 1) {
       await leaderboard.upsertScore({
         playerId: `player-${String(index + 1).padStart(2, "0")}`,
-        platform: PlatformKind.WeChat,
+        platform: index % 2 === 0 ? PlatformKind.WeChat : PlatformKind.ByteDance,
         level: 100 - index,
         nickName: `旅行者${index + 1}`,
         avatarUrl: `https://example.com/${index + 1}.png`,
@@ -92,6 +94,48 @@ describe("管理端闯关榜 API", () => {
     const invalid = await app!.inject({ method: "GET", url: "/admin/v1/leaderboards/level?page=0", headers: { cookie } });
     expect(anonymous.statusCode).toBe(401);
     expect(invalid.statusCode).toBe(400);
+  });
+
+  it("按微信昵称、平台和用户ID筛选并保留全榜真实名次", async () => {
+    const nickname = await app!.inject({
+      method: "GET", url: "/admin/v1/leaderboards/level?page=1&nickName=%E6%97%85%E8%A1%8C%E8%80%852",
+      headers: { cookie },
+    });
+    expect(nickname.statusCode).toBe(200);
+    expect(nickname.json<LeaderboardResponseBody>().data.items.map((item) => item.rank))
+      .toEqual([2, 20, 21, 22, 23, 24, 25]);
+
+    const platform = await app!.inject({
+      method: "GET", url: "/admin/v1/leaderboards/level?page=1&platform=bytedance",
+      headers: { cookie },
+    });
+    expect(platform.statusCode).toBe(200);
+    expect(platform.json<LeaderboardResponseBody>().data.items.map((item) => item.rank))
+      .toEqual([2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24]);
+
+    const combined = await app!.inject({
+      method: "GET",
+      url: "/admin/v1/leaderboards/level?page=1&playerId=player-07&platform=wechat&nickName=%E6%97%85%E8%A1%8C",
+      headers: { cookie },
+    });
+    expect(combined.statusCode).toBe(200);
+    expect(combined.json<LeaderboardResponseBody>().data.items).toEqual([
+      expect.objectContaining({ rank: 7, playerId: "player-07", platform: "wechat" }),
+    ]);
+  });
+
+  it("筛选后仍按20条分页并校验非法筛选条件", async () => {
+    const noMatch = await app!.inject({
+      method: "GET", url: "/admin/v1/leaderboards/level?page=1&playerId=missing-player",
+      headers: { cookie },
+    });
+    const invalidPlatform = await app!.inject({
+      method: "GET", url: "/admin/v1/leaderboards/level?page=1&platform=web",
+      headers: { cookie },
+    });
+    expect(noMatch.statusCode).toBe(200);
+    expect(noMatch.json<LeaderboardResponseBody>().data).toMatchObject({ items: [], hasMore: false, pageSize: 20 });
+    expect(invalidPlatform.statusCode).toBe(400);
   });
 });
 
@@ -177,5 +221,37 @@ describe("闯关榜投影", () => {
     await expect(leaderboard.findByPlayerId("player-2")).resolves.toMatchObject({
       level: 12, nickName: "云朵旅行者", avatarUrl: "https://example.com/cloud.png",
     });
+  });
+});
+
+describe("CloudBase闯关榜筛选", () => {
+  it("跨批次扫描筛选结果并保留全榜名次", async () => {
+    const documents = Array.from({ length: 130 }, (_, index) => ({
+      playerId: `player-${String(index + 1).padStart(3, "0")}`,
+      platform: index % 2 === 0 ? "wechat" : "bytedance",
+      level: 200 - index,
+      nickName: index === 119 ? "目标旅行猫" : `旅行者${index + 1}`,
+      avatarUrl: "",
+      reachedAt: 1_000 + index,
+      scoreUpdatedAt: 1_000 + index,
+      updatedAt: 1_000 + index,
+      sortKey: String(index),
+    }));
+    let offset = 0;
+    let limit = 100;
+    const get = vi.fn(() => Promise.resolve({ requestId: "query", data: documents.slice(offset, offset + limit) }));
+    const query = {
+      orderBy: vi.fn(() => query),
+      skip: vi.fn((value: number) => { offset = value; return query; }),
+      limit: vi.fn((value: number) => { limit = value; return query; }),
+      get,
+    } as unknown as CloudBaseQueryReference;
+    const collection = { where: vi.fn(() => query) } as unknown as CloudBaseCollectionReference;
+    const repository = new CloudBaseLevelLeaderboardRepository(collection);
+
+    const result = await repository.list({ offset: 0, limit: 21, playerId: "player-120", nickName: "旅行猫" });
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ rank: 120, entry: { playerId: "player-120" } });
+    expect(get).toHaveBeenCalledTimes(2);
   });
 });

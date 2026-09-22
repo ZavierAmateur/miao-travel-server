@@ -1,7 +1,9 @@
-import type { LevelLeaderboardEntry, LevelLeaderboardListQuery, UpsertLevelScoreCommand } from "../../domain/leaderboard/LevelLeaderboard.js";
+import type { LevelLeaderboardEntry, LevelLeaderboardListQuery, RankedLevelLeaderboardEntry, UpsertLevelScoreCommand } from "../../domain/leaderboard/LevelLeaderboard.js";
 import type { LevelLeaderboardRepository } from "../../domain/leaderboard/LevelLeaderboardRepository.js";
 import type { CloudBaseCollectionReference } from "../persistence/CloudBaseDatabase.js";
 import { isMissingDocument } from "../persistence/CloudBaseErrors.js";
+
+const SCAN_BATCH_SIZE = 100;
 
 interface LevelLeaderboardDocument extends LevelLeaderboardEntry {
   readonly sortKey: string;
@@ -49,16 +51,34 @@ export class CloudBaseLevelLeaderboardRepository implements LevelLeaderboardRepo
     await this.collection.doc(playerId).set(toDocument(updated));
   }
 
-  async list(query: LevelLeaderboardListQuery): Promise<readonly LevelLeaderboardEntry[]> {
-    const result = await this.collection.where({})
-      .orderBy("sortKey", "asc")
-      .skip(query.offset)
-      .limit(query.limit)
-      .get();
-    return result.data.flatMap((value) => {
-      const entry = toEntry(value);
-      return entry ? [entry] : [];
-    });
+  async list(query: LevelLeaderboardListQuery) {
+    const matches: RankedLevelLeaderboardEntry[] = [];
+    const normalizedNickname = query.nickName?.toLocaleLowerCase();
+    let databaseOffset = 0;
+    let matchedCount = 0;
+    let globalRank = 0;
+    while (matches.length < query.limit) {
+      const result = await this.collection.where({})
+        .orderBy("sortKey", "asc")
+        .skip(databaseOffset)
+        .limit(SCAN_BATCH_SIZE)
+        .get();
+      for (const value of result.data) {
+        const entry = toEntry(value);
+        if (!entry) continue;
+        globalRank += 1;
+        const matched = (!query.playerId || entry.playerId === query.playerId)
+          && (!query.platform || entry.platform === query.platform)
+          && (!normalizedNickname || entry.nickName.toLocaleLowerCase().includes(normalizedNickname));
+        if (!matched) continue;
+        if (matchedCount >= query.offset) matches.push({ entry, rank: globalRank });
+        matchedCount += 1;
+        if (matches.length >= query.limit) break;
+      }
+      databaseOffset += result.data.length;
+      if (result.data.length < SCAN_BATCH_SIZE) break;
+    }
+    return matches;
   }
 }
 

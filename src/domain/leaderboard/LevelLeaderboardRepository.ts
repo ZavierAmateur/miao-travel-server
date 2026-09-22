@@ -1,6 +1,7 @@
 import type {
   LevelLeaderboardEntry,
   LevelLeaderboardListQuery,
+  RankedLevelLeaderboardEntry,
   UpsertLevelScoreCommand,
 } from "./LevelLeaderboard.js";
 
@@ -12,5 +13,5 @@ export interface LevelLeaderboardRepository {
     readonly avatarUrl: string;
     readonly updatedAt: number;
   }): Promise<void>;
-  list(query: LevelLeaderboardListQuery): Promise<readonly LevelLeaderboardEntry[]>;
+  list(query: LevelLeaderboardListQuery): Promise<readonly RankedLevelLeaderboardEntry[]>;
 }

@@ -1,4 +1,4 @@
-import type { LevelLeaderboardEntry, LevelLeaderboardListQuery, UpsertLevelScoreCommand } from "../../domain/leaderboard/LevelLeaderboard.js";
+import type { LevelLeaderboardEntry, LevelLeaderboardListQuery, RankedLevelLeaderboardEntry, UpsertLevelScoreCommand } from "../../domain/leaderboard/LevelLeaderboard.js";
 import type { LevelLeaderboardRepository } from "../../domain/leaderboard/LevelLeaderboardRepository.js";
 
 export class InMemoryLevelLeaderboardRepository implements LevelLeaderboardRepository {
@@ -38,11 +38,17 @@ export class InMemoryLevelLeaderboardRepository implements LevelLeaderboardRepos
     return Promise.resolve();
   }
 
-  list(query: LevelLeaderboardListQuery): Promise<readonly LevelLeaderboardEntry[]> {
+  list(query: LevelLeaderboardListQuery): Promise<readonly RankedLevelLeaderboardEntry[]> {
     const sorted = [...this.entries.values()].sort((left, right) =>
       right.level - left.level
       || left.reachedAt - right.reachedAt
       || left.playerId.localeCompare(right.playerId));
-    return Promise.resolve(sorted.slice(query.offset, query.offset + query.limit));
+    const normalizedNickname = query.nickName?.toLocaleLowerCase();
+    const filtered = sorted
+      .map((entry, index) => ({ entry, rank: index + 1 }))
+      .filter(({ entry }) => (!query.playerId || entry.playerId === query.playerId)
+        && (!query.platform || entry.platform === query.platform)
+        && (!normalizedNickname || entry.nickName.toLocaleLowerCase().includes(normalizedNickname)));
+    return Promise.resolve(filtered.slice(query.offset, query.offset + query.limit));
   }
 }

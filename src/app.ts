@@ -327,12 +327,17 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     }
 
     if (options.adminLeaderboardService) {
-      app.get<{ Querystring: { page?: number } }>("/admin/v1/leaderboards/level", {
+      app.get<{ Querystring: { page?: number; playerId?: string; platform?: "wechat" | "bytedance"; nickName?: string } }>("/admin/v1/leaderboards/level", {
         schema: {
           querystring: {
             type: "object",
             additionalProperties: false,
-            properties: { page: { type: "integer", minimum: 1, maximum: 10_000 } },
+            properties: {
+              page: { type: "integer", minimum: 1, maximum: 10_000 },
+              playerId: { type: "string", minLength: 1, maxLength: 128 },
+              platform: { type: "string", enum: ["wechat", "bytedance"] },
+              nickName: { type: "string", minLength: 1, maxLength: 50 },
+            },
           },
         },
       }, async (request, reply) => {

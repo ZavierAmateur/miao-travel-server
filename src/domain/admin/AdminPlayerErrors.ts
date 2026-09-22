@@ -5,6 +5,7 @@ export class AdminPlayerError extends Error {
       | "PLAYER_NOT_FOUND"
       | "INVALID_CURSOR"
       | "INVALID_LEADERBOARD_PAGE"
+      | "INVALID_LEADERBOARD_FILTER"
       | "INVALID_ADMIN_ACTION"
       | "SAVE_NOT_FOUND"
       | "SAVE_PREVIOUS_NOT_FOUND"
