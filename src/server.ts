@@ -14,6 +14,8 @@ import { AnnouncementService } from "./domain/announcement/AnnouncementService.j
 import { loadCosStorageConfig } from "./config/CosStorageConfig.js";
 import { AdminFileService } from "./domain/file/AdminFileService.js";
 import { CosFileStorage } from "./infrastructure/storage/CosFileStorage.js";
+import { LevelLeaderboardProjector } from "./domain/leaderboard/LevelLeaderboardProjector.js";
+import { AdminLeaderboardService } from "./domain/leaderboard/AdminLeaderboardService.js";
 
 const config = loadConfig();
 assertPersistenceReady(config);
@@ -24,16 +26,23 @@ const platformLoginService = new PlatformLoginService({
   players: persistence.players,
   sessions: persistence.sessions,
 });
+const levelLeaderboardProjector = new LevelLeaderboardProjector({
+  leaderboard: persistence.levelLeaderboard,
+  players: persistence.players,
+  profiles: persistence.profiles,
+});
 const cloudSaveService = new CloudSaveService({
   sessions: persistence.sessions,
   saves: persistence.saves,
   players: persistence.players,
+  leaderboard: levelLeaderboardProjector,
 });
 const bootstrapConfigService = new BootstrapConfigService(persistence.bootstrapConfigs);
 const playerProfileService = new PlayerProfileService({
   sessions: persistence.sessions,
   profiles: persistence.profiles,
   players: persistence.players,
+  leaderboard: levelLeaderboardProjector,
 });
 const adminAuthConfig = loadAdminAuthConfig();
 const adminAuthService = adminAuthConfig.enabled
@@ -42,6 +51,9 @@ const adminAuthService = adminAuthConfig.enabled
       sessions: persistence.adminSessions,
       audits: persistence.adminAudits,
     })
+  : undefined;
+const adminLeaderboardService = adminAuthService
+  ? new AdminLeaderboardService({ auth: adminAuthService, leaderboard: persistence.levelLeaderboard })
   : undefined;
 if (adminAuthService) {
   await adminAuthService.ensureBootstrapAdmin(
@@ -57,6 +69,7 @@ const adminPlayerService = adminAuthService
       profiles: persistence.profiles,
       saves: persistence.saves,
       audits: persistence.adminAudits,
+      leaderboard: levelLeaderboardProjector,
     })
   : undefined;
 const adminErrorLogService = adminAuthService
@@ -87,6 +100,7 @@ const app = buildApp({
   announcementService,
   ...(adminAuthService && adminErrorLogService ? { adminAuthService, adminAuthConfig, adminErrorLogService } : {}),
   ...(adminPlayerService ? { adminPlayerService } : {}),
+  ...(adminLeaderboardService ? { adminLeaderboardService } : {}),
   ...(adminFileService ? { adminFileService } : {}),
 });
 

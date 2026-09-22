@@ -211,6 +211,36 @@ todayAdReliveCount
 | 401 | `SESSION_INVALID` | token 无效或已撤销 |
 | 401 | `SESSION_EXPIRED` | token 已过期 |
 
+## `GET /admin/v1/leaderboards/level`
+
+管理后台全平台闯关榜，使用管理员 Cookie 会话并要求 `player:read` 权限。该接口与微信小游戏开放数据域中的“好友闯关榜”相互独立，不返回微信好友关系。
+
+查询参数只有 `page`，从 1 开始；服务端固定每页 20 条。成功数据：
+
+```json
+{
+  "items": [
+    {
+      "rank": 1,
+      "playerId": "682e01dc-c682-52b3-ad4f-9fafde8f85fb",
+      "platform": "wechat",
+      "level": 328,
+      "nickName": "旅行者",
+      "avatarUrl": "https://example.com/avatar.png",
+      "reachedAt": 1789520000000,
+      "updatedAt": 1789520000000
+    }
+  ],
+  "page": 1,
+  "pageSize": 20,
+  "hasMore": false
+}
+```
+
+榜单按当前到达关卡降序排列，同关卡按首次达到当前关卡的服务端时间升序排列。`rank` 是全平台连续名次。排行榜数据来自云存档 `save.modules.user.level` 的轻量投影；昵称头像来自独立玩家资料。云存档回滚后会同步回退榜单关卡。
+
+部署时需先创建 `level_leaderboard` 集合；已有云存档可执行 `npm run leaderboard:backfill:wechat` 一次性回填。游戏前端不调用本接口。
+
 ## 管理员认证 `/admin/v1/auth/*`
 
 管理员认证与玩家 Bearer 会话完全独立。V1 角色仅为 `admin`（超管）和 `operator`（运营）。管理会话通过 `miao_admin_session` HttpOnly Cookie 传递，响应正文不返回 token。

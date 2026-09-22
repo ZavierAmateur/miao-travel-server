@@ -26,6 +26,7 @@ import { AnnouncementError } from "./domain/announcement/AnnouncementErrors.js";
 import type { AdminFileService } from "./domain/file/AdminFileService.js";
 import { MAX_UPLOAD_BYTES } from "./domain/file/AdminFileService.js";
 import { AdminFileError } from "./domain/file/AdminFileErrors.js";
+import type { AdminLeaderboardService } from "./domain/leaderboard/AdminLeaderboardService.js";
 
 const ADMIN_SESSION_COOKIE = "miao_admin_session";
 
@@ -41,6 +42,7 @@ export interface BuildAppOptions {
   readonly adminErrorLogService?: AdminErrorLogService;
   readonly announcementService?: AnnouncementService;
   readonly adminFileService?: AdminFileService;
+  readonly adminLeaderboardService?: AdminLeaderboardService;
   readonly now?: () => number;
 }
 
@@ -319,6 +321,24 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
         const result = await options.adminPlayerService!.unban(
           readAdminCookie(request.headers.cookie), request.params.playerId, request.body,
           { requestId: request.id, ip: request.ip },
+        );
+        return success(request.id, result, now());
+      });
+    }
+
+    if (options.adminLeaderboardService) {
+      app.get<{ Querystring: { page?: number } }>("/admin/v1/leaderboards/level", {
+        schema: {
+          querystring: {
+            type: "object",
+            additionalProperties: false,
+            properties: { page: { type: "integer", minimum: 1, maximum: 10_000 } },
+          },
+        },
+      }, async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        const result = await options.adminLeaderboardService!.listLevel(
+          readAdminCookie(request.headers.cookie), request.query,
         );
         return success(request.id, result, now());
       });

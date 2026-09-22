@@ -32,6 +32,7 @@ const collectionNames = [
   "admin_audit_logs",
   "admin_error_logs",
   "announcements",
+  "level_leaderboard",
 ] as const;
 for (const collectionName of collectionNames) {
   await ensureCollection(database, collectionName);

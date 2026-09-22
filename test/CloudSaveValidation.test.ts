@@ -71,6 +71,15 @@ describe("云存档输入校验", () => {
     })).toThrowError(/不允许的存档模块/);
   });
 
+  it("拒绝无法用于闯关榜的非法关卡", () => {
+    for (const level of [0, 1.5, 1_000_001]) {
+      expect(() => validateCloudSaveInput({
+        ...validInput(),
+        save: { ...validInput().save, modules: { user: { level } } },
+      })).toThrowError(/user\.level/);
+    }
+  });
+
   it("拒绝危险原型字段", () => {
     const modules = JSON.parse('{"user":{"__proto__":{"polluted":true}}}') as object;
     expect(() => validateCloudSaveInput({

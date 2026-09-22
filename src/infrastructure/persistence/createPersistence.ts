@@ -22,6 +22,9 @@ import { CloudBaseAdminAuditRepository, CloudBaseAdminErrorLogRepository, CloudB
 import type { AnnouncementRepository } from "../../domain/announcement/AnnouncementRepository.js";
 import { InMemoryAnnouncementRepository } from "../repositories/InMemoryAnnouncementRepository.js";
 import { CloudBaseAnnouncementRepository } from "../repositories/CloudBaseAnnouncementRepository.js";
+import type { LevelLeaderboardRepository } from "../../domain/leaderboard/LevelLeaderboardRepository.js";
+import { InMemoryLevelLeaderboardRepository } from "../repositories/InMemoryLevelLeaderboardRepository.js";
+import { CloudBaseLevelLeaderboardRepository } from "../repositories/CloudBaseLevelLeaderboardRepository.js";
 
 export interface Persistence {
   readonly players: PlayerRepository;
@@ -34,6 +37,7 @@ export interface Persistence {
   readonly adminAudits: AdminAuditRepository;
   readonly adminErrorLogs: AdminErrorLogRepository;
   readonly announcements: AnnouncementRepository;
+  readonly levelLeaderboard: LevelLeaderboardRepository;
   close(): Promise<void>;
 }
 
@@ -50,6 +54,7 @@ export function createPersistence(config: AppConfig): Promise<Persistence> {
       adminAudits: new InMemoryAdminAuditRepository(),
       adminErrorLogs: new InMemoryAdminErrorLogRepository(),
       announcements: new InMemoryAnnouncementRepository(),
+      levelLeaderboard: new InMemoryLevelLeaderboardRepository(),
       close: () => Promise.resolve(),
     });
   }
@@ -75,6 +80,7 @@ export function createPersistence(config: AppConfig): Promise<Persistence> {
     adminAudits: new CloudBaseAdminAuditRepository(database.collection("admin_audit_logs")),
     adminErrorLogs: new CloudBaseAdminErrorLogRepository(database.collection("admin_error_logs")),
     announcements: new CloudBaseAnnouncementRepository(database.collection("announcements")),
+    levelLeaderboard: new CloudBaseLevelLeaderboardRepository(database.collection("level_leaderboard")),
     close: () => Promise.resolve(),
   });
 }

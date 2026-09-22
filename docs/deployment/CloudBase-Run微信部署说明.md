@@ -118,4 +118,20 @@ npm run profile:check:wechat
 
 公告阶段新增 `announcements` 集合，部署前运行 `npm run db:check:wechat` 会在缺失时创建。通用上传接口由服务器使用 `COS_SECRET_ID/COS_SECRET_KEY` 写入 COS；密钥不得配置在管理后台或小游戏前端。存储桶保持“公有读、私有写”，并给该服务端密钥配置尽量小的对象上传权限。
 
+## 闯关榜部署
+
+排行榜阶段新增 `level_leaderboard` 集合。部署新代码前执行：
+
+```bash
+npm run db:check:wechat
+```
+
+新云存档和微信资料会自动更新榜单。首次部署后执行一次历史回填：
+
+```bash
+npm run leaderboard:backfill:wechat
+```
+
+后台接口为 `GET /admin/v1/leaderboards/level?page=1`，固定每页 20 条。小游戏中的微信好友榜使用开放数据域，不读取该集合，也不会把微信好友关系写入服务器。
+
 COS 默认域名可以先用于接口联调。控制台已经提示 2024 年以后创建的存储桶默认域名可能不能直接在浏览器预览，正式展示前应绑定自定义 HTTPS 或 CDN 域名，并把 `COS_PUBLIC_BASE_URL` 更新为该域名；公告数据结构和接口不需要调整。

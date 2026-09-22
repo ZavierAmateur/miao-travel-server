@@ -21,6 +21,7 @@
     "save:check:wechat": "node --env-file=.env.wechat.local --import tsx scripts/check-cloud-save.ts",
     "profile:check:wechat": "node --env-file=.env.wechat.local --import tsx scripts/check-player-profile.ts",
     "error-log:check:wechat": "node --env-file=.env.wechat.local --import tsx scripts/check-admin-error-logs.ts",
+    "leaderboard:backfill:wechat": "node --env-file=.env.wechat.local --import tsx scripts/backfill-level-leaderboard.ts",
     "bootstrap:publish:wechat": "node --env-file=.env.wechat.local --import tsx scripts/publish-bootstrap-config.ts"
   },
   "dependencies": {

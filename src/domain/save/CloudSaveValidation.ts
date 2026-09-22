@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { CloudSavePayload, JsonValue } from "./CloudSave.js";
 import { CloudSaveValidationError } from "./CloudSaveErrors.js";
+import { MAX_LEADERBOARD_LEVEL } from "../leaderboard/LevelLeaderboardProjector.js";
 
 export const MAX_SAVE_BYTES = 512 * 1024;
 const MAX_DEPTH = 32;
@@ -103,6 +104,10 @@ function validatePayload(value: unknown): CloudSavePayload {
     if (!LEGACY_ALLOWED_MODULES.has(moduleName)) throw invalid(`不允许的存档模块：${moduleName}`);
   }
   if (!isPlainObject(value.modules.user)) throw invalid("V1 云存档必须包含 user 对象");
+  const level = value.modules.user.level;
+  if (level !== undefined && (!Number.isSafeInteger(level) || (level as number) < 1 || (level as number) > MAX_LEADERBOARD_LEVEL)) {
+    throw invalid(`user.level 必须是 1-${MAX_LEADERBOARD_LEVEL} 的安全整数`);
+  }
 
   const counter = { value: 0 };
   validateJsonValue(value.modules, 0, counter);
