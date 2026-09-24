@@ -19,6 +19,7 @@
     "db:check:wechat": "node --env-file=.env.wechat.local --import tsx scripts/check-cloudbase-persistence.ts",
     "save:check": "node --env-file-if-exists=.env --import tsx scripts/check-cloud-save.ts",
     "save:check:wechat": "node --env-file=.env.wechat.local --import tsx scripts/check-cloud-save.ts",
+    "save:cleanup-pets:wechat": "node --env-file=.env.wechat.local --import tsx scripts/cleanup-legacy-pets.ts",
     "profile:check:wechat": "node --env-file=.env.wechat.local --import tsx scripts/check-player-profile.ts",
     "error-log:check:wechat": "node --env-file=.env.wechat.local --import tsx scripts/check-admin-error-logs.ts",
     "leaderboard:backfill:wechat": "node --env-file=.env.wechat.local --import tsx scripts/backfill-level-leaderboard.ts",

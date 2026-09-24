@@ -57,6 +57,32 @@ describe("云存档输入校验", () => {
     expect(validated.save.modules.user).toEqual({ level: 3, energy: 9 });
   });
 
+  it("删除旧宠物ID并只保留现行宠物持有记录", () => {
+    const validated = validateCloudSaveInput({
+      ...validInput(),
+      save: {
+        ...validInput().save,
+        modules: {
+          user: {
+            refreshAnimalId: 50009,
+            todayAnimalId: 50008,
+            animals: [
+              { id: 50008, getTime: 12, using: 1, unlock: 1, stars: 20, ads: 3 },
+              { id: 50009, getTime: 15, using: 0, unlock: 0, stars: 8, ads: 1 },
+              { id: 50105, getTime: 16, using: 1 },
+              { id: 50100, getTime: 18, using: 1, stars: 99 },
+            ],
+          },
+        },
+      },
+    });
+    expect(validated.save.modules.user).toEqual({
+      animals: [
+        { id: 50100, getTime: 18, using: 1 },
+      ],
+    });
+  });
+
   it("拒绝不包含 user 的旧模块存档", () => {
     expect(() => validateCloudSaveInput({
       ...validInput(),

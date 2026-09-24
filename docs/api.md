@@ -192,14 +192,18 @@ V1 `modules.user` 字段白名单固定为：
 ```text
 saveTime, undoCount, refreshCount, bombCount, winnerStreakCount,
 todaySuccessCount, animals, todayVideoForEnergyCount, sevenSignProgress,
-sevenSignTodayState, refreshAnimalId, todayAnimalId, levelMaxProgress,
-subscribeStae, adFreeCount, level, energy, energyTimer, energyInfinite,
+sevenSignTodayState, levelMaxProgress, subscribeStae, adFreeCount, level,
+energy, energyTimer, energyInfinite,
 gold, star, totalRechargeAmount, totalGoodBuyCounts, todayGoodBuyCounts,
 todayGoodsBuyTime, firstSevenAwardGot, myMiniProgramDaily, desktopDaily,
 todayAdReliveCount
 ```
 
 未列入白名单的 user 字段会被服务端丢弃。CloudBase 条件更新使用整对象替换语义，因此一次成功 PUT 后，当前 `save` 中这次请求已省略的历史 user 字段会被实际删除；`revision` 条件写、幂等与 409 冲突规则不变。
+
+`animals` 只保留 `{ id, getTime, using }`。当前开发阶段不迁移旧宠物ID，仅接受现行宠物 `50100`；旧宠物及其星星、广告培养进度会被直接删除。
+
+开发 CloudBase 存量数据可先执行 `npm run save:cleanup-pets:wechat` 预览影响范围，确认后执行 `npm run save:cleanup-pets:wechat -- --apply`。脚本只清理当前版和上一版中的旧宠物数据，并拒绝在 `NODE_ENV=production` 下应用。
 
 错误码：
 

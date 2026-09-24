@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { CloudSavePayload, JsonValue } from "./CloudSave.js";
 import { CloudSaveValidationError } from "./CloudSaveErrors.js";
 import { MAX_LEADERBOARD_LEVEL } from "../leaderboard/LevelLeaderboardProjector.js";
+import { normalizeCurrentPetRecords } from "./PetSaveCleanup.js";
 
 export const MAX_SAVE_BYTES = 512 * 1024;
 const MAX_DEPTH = 32;
@@ -18,8 +19,6 @@ export const V1_CLOUD_PLAYER_FIELDS = [
   "todayVideoForEnergyCount",
   "sevenSignProgress",
   "sevenSignTodayState",
-  "refreshAnimalId",
-  "todayAnimalId",
   "levelMaxProgress",
   "subscribeStae",
   "adFreeCount",
@@ -38,6 +37,7 @@ export const V1_CLOUD_PLAYER_FIELDS = [
   "desktopDaily",
   "todayAdReliveCount",
 ] as const;
+
 const LEGACY_ALLOWED_MODULES = new Set(["settings", "tutorial", "user", "task", "activitys"]);
 const V1_CLOUD_PLAYER_FIELD_SET = new Set<string>(V1_CLOUD_PLAYER_FIELDS);
 const FORBIDDEN_KEYS = new Set(["__proto__", "prototype", "constructor"]);
@@ -129,7 +129,8 @@ function normalizeV1CloudSavePayload(value: CloudSavePayload): CloudSavePayload 
   const normalizedUser: Record<string, JsonValue> = {};
   if (isPlainObject(user)) {
     for (const [key, item] of Object.entries(user)) {
-      if (V1_CLOUD_PLAYER_FIELD_SET.has(key)) normalizedUser[key] = item;
+      if (!V1_CLOUD_PLAYER_FIELD_SET.has(key)) continue;
+      normalizedUser[key] = key === "animals" ? normalizeCurrentPetRecords(item) : item;
     }
   }
   return {
@@ -166,7 +167,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
-function stableStringify(value: unknown): string {
+export function stableStringify(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
   if (isPlainObject(value)) {
     return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
