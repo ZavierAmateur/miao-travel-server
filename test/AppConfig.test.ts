@@ -16,6 +16,7 @@ describe("loadConfig", () => {
     expect(config.port).toBe(3000);
     expect(config.appSecret).toBe("");
     expect(config.persistenceDriver).toBe(PersistenceDriver.Memory);
+    expect(config.openingVideoFileId).toContain("/video/game_video.mp4");
   });
 
   it("拒绝生产环境缺少平台密钥", () => {

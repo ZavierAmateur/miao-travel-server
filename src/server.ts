@@ -16,6 +16,8 @@ import { AdminFileService } from "./domain/file/AdminFileService.js";
 import { CosFileStorage } from "./infrastructure/storage/CosFileStorage.js";
 import { LevelLeaderboardProjector } from "./domain/leaderboard/LevelLeaderboardProjector.js";
 import { AdminLeaderboardService } from "./domain/leaderboard/AdminLeaderboardService.js";
+import { OpeningVideoUrlService } from "./domain/video/OpeningVideoUrlService.js";
+import { CloudBaseOpeningVideoUrlSigner } from "./infrastructure/storage/CloudBaseOpeningVideoUrlSigner.js";
 
 const config = loadConfig();
 assertPersistenceReady(config);
@@ -91,6 +93,21 @@ const adminFileService = adminAuthService
       ...(cosStorageConfig.enabled ? { storage: new CosFileStorage(cosStorageConfig) } : {}),
     })
   : undefined;
+const openingVideoUrlService = config.cloudbaseEnvId
+  && config.cloudbaseRegion
+  && config.cloudbaseApiKey
+  && config.openingVideoFileId
+  ? new OpeningVideoUrlService({
+      sessions: persistence.sessions,
+      players: persistence.players,
+      signer: new CloudBaseOpeningVideoUrlSigner(
+        config.cloudbaseEnvId,
+        config.cloudbaseRegion,
+        config.cloudbaseApiKey,
+      ),
+      fileId: config.openingVideoFileId,
+    })
+  : undefined;
 const app = buildApp({
   config,
   platformLoginService,
@@ -102,6 +119,7 @@ const app = buildApp({
   ...(adminPlayerService ? { adminPlayerService } : {}),
   ...(adminLeaderboardService ? { adminLeaderboardService } : {}),
   ...(adminFileService ? { adminFileService } : {}),
+  ...(openingVideoUrlService ? { openingVideoUrlService } : {}),
 });
 
 const shutdown = async (signal: string): Promise<void> => {
