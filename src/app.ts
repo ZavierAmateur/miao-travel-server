@@ -27,7 +27,6 @@ import type { AdminFileService } from "./domain/file/AdminFileService.js";
 import { MAX_UPLOAD_BYTES } from "./domain/file/AdminFileService.js";
 import { AdminFileError } from "./domain/file/AdminFileErrors.js";
 import type { AdminLeaderboardService } from "./domain/leaderboard/AdminLeaderboardService.js";
-import type { OpeningVideoUrlService } from "./domain/video/OpeningVideoUrlService.js";
 
 const ADMIN_SESSION_COOKIE = "miao_admin_session";
 
@@ -44,7 +43,6 @@ export interface BuildAppOptions {
   readonly announcementService?: AnnouncementService;
   readonly adminFileService?: AdminFileService;
   readonly adminLeaderboardService?: AdminLeaderboardService;
-  readonly openingVideoUrlService?: Pick<OpeningVideoUrlService, "get">;
   readonly now?: () => number;
 }
 
@@ -607,14 +605,6 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     }, async (request, reply) => {
       reply.header("cache-control", "no-store");
       const result = await options.playerProfileService!.put(request.headers.authorization, request.body);
-      return success(request.id, result, now());
-    });
-  }
-
-  if (options.openingVideoUrlService) {
-    app.get("/v1/opening-video-url", async (request, reply) => {
-      reply.header("cache-control", "private, no-store");
-      const result = await options.openingVideoUrlService!.get(request.headers.authorization);
       return success(request.id, result, now());
     });
   }

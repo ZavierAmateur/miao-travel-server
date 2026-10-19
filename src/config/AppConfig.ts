@@ -20,8 +20,6 @@ export const PersistenceDriver = Object.freeze({
 
 export type PersistenceDriver = typeof PersistenceDriver[keyof typeof PersistenceDriver];
 
-export const DEFAULT_OPENING_VIDEO_FILE_ID = "cloud://cloud1-d3guut2kr1085b24f.636c-cloud1-d3guut2kr1085b24f-1488607878/video/game_video.mp4";
-
 export interface AppConfig {
   readonly environment: AppEnvironment;
   readonly host: string;
@@ -36,7 +34,6 @@ export interface AppConfig {
   readonly cloudbaseApiKey: string;
   readonly cloudbaseDatabaseInstance: string;
   readonly cloudDatabaseName: string;
-  readonly openingVideoFileId?: string;
 }
 
 export class ConfigValidationError extends Error {
@@ -70,7 +67,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     || "";
   const cloudbaseDatabaseInstance = env.CLOUDBASE_DATABASE_INSTANCE?.trim() ?? "";
   const cloudDatabaseName = env.CLOUDBASE_DATABASE_NAME?.trim() ?? "";
-  const openingVideoFileId = env.OPENING_VIDEO_FILE_ID?.trim() || DEFAULT_OPENING_VIDEO_FILE_ID;
 
   if (!environments.has(environment)) issues.push(`NODE_ENV 不支持：${environment}`);
   if (!Number.isInteger(port) || port < 1 || port > 65_535) issues.push(`PORT 必须是 1-65535 的整数：${rawPort}`);
@@ -105,7 +101,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     cloudbaseApiKey,
     cloudbaseDatabaseInstance,
     cloudDatabaseName,
-    openingVideoFileId,
   };
 }
 
