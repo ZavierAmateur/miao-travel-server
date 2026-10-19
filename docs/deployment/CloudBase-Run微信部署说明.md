@@ -44,7 +44,7 @@
 | `COS_SECRET_KEY` | 腾讯云 API 密钥 Key，使用 Secret 管理 |
 | `COS_BUCKET` | `miao-1487859276` |
 | `COS_REGION` | `ap-guangzhou` |
-| `COS_PUBLIC_BASE_URL` | `https://miao-1487859276.cos.ap-guangzhou.myqcloud.com`；以后绑定自定义 HTTPS 域名时替换 |
+| `COS_PUBLIC_BASE_URL` | `https://cdn.sujiegame.com`，只填 CDN 根域名，不追加目录 |
 
 聊天中曾出现过 AppSecret。正式上线前先在微信公众平台轮换，再把新值写入 CloudBase Secret；旧值不得继续用于正式环境。
 
@@ -118,6 +118,12 @@ npm run profile:check:wechat
 
 公告阶段新增 `announcements` 集合，部署前运行 `npm run db:check:wechat` 会在缺失时创建。通用上传接口由服务器使用 `COS_SECRET_ID/COS_SECRET_KEY` 写入 COS；密钥不得配置在管理后台或小游戏前端。存储桶保持“公有读、私有写”，并给该服务端密钥配置尽量小的对象上传权限。
 
+后台图片与游戏资源共用主桶 `miao-1487859276`，统一放入 `admin/uploads/`。对象名为 `原文件名_北京时间YYYYMMDD_UUID.真实后缀`，原始图片字节直接上传，单文件不超过 5MB。WebP 转换由 COS 桶工作流负责，须覆盖 `admin/uploads/`，并以同目录、同名替换后缀生成 `.webp`。例如原图 `海报_20261019_ID.png` 对应输出 `海报_20261019_ID.webp`，公告保存输出对象的引用。
+
+部署时同步设置 `COS_BUCKET=miao-1487859276`、`COS_REGION=ap-guangzhou` 和 `COS_PUBLIC_BASE_URL=https://cdn.sujiegame.com`。服务端密钥需要主桶 `admin/uploads/*` 的 `cos:PutObject` 和 `cos:HeadObject` 权限。PNG/JPEG 上传后会直接查询 COS 确认 WebP 已生成，最多查询 20 次，未就绪时各次间隔 1 秒；查询失败或输出一直未就绪则返回 `FILE_PROCESSING_FAILED`，不返回可能立即 404 的 CDN 链接。CDN 源站继续使用主桶，新文件采用新 URL。
+
+验证新公告能通过 CDN 显示后，再单独安排旧公告图片迁移；修改环境变量不会改写已有公告中的 URL。旧桶删除前仍需核对历史引用。
+
 ## 闯关榜部署
 
 排行榜阶段新增 `level_leaderboard` 集合。部署新代码前执行：
@@ -133,5 +139,3 @@ npm run leaderboard:backfill:wechat
 ```
 
 后台接口为 `GET /admin/v1/leaderboards/level?page=1`，固定每页 20 条。小游戏中的微信好友榜使用开放数据域，不读取该集合，也不会把微信好友关系写入服务器。
-
-COS 默认域名可以先用于接口联调。控制台已经提示 2024 年以后创建的存储桶默认域名可能不能直接在浏览器预览，正式展示前应绑定自定义 HTTPS 或 CDN 域名，并把 `COS_PUBLIC_BASE_URL` 更新为该域名；公告数据结构和接口不需要调整。

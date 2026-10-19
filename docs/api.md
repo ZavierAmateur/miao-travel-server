@@ -366,8 +366,8 @@ todayAdReliveCount
   "images": [
     {
       "fileId": "上传接口返回的文件 ID",
-      "objectKey": "uploads/2026/09/example.webp",
-      "url": "https://静态资源域名/uploads/2026/09/example.webp",
+      "objectKey": "admin/uploads/海报_20261019_example.webp",
+      "url": "https://cdn.sujiegame.com/admin/uploads/%E6%B5%B7%E6%8A%A5_20261019_example.webp",
       "alt": "活动海报"
     }
   ],
@@ -384,22 +384,24 @@ todayAdReliveCount
 
 ## `POST /admin/v1/files/upload`
 
-通用服务端文件上传接口，使用管理员 Cookie 并要求 `config:write`。请求为 `multipart/form-data`，文件字段名为 `file`。当前允许 JPEG、PNG、WebP，按文件头识别，单文件最大 5MB。
+通用服务端文件上传接口，使用管理员 Cookie 并要求 `config:write`。请求为 `multipart/form-data`，文件字段名为 `file`。接收 JPEG、PNG、WebP，检查文件头和 5MB 大小上限，按原始字节及真实格式上传。WebP 由 COS 桶工作流生成，输出路径为同目录、同名替换后缀的 `.webp`。PNG/JPEG 上传后直接查询 COS，确认对应 WebP 已生成再返回成功；最多检查 20 次，未就绪时各次检查间隔 1 秒。
+
+对象统一放在 `admin/uploads/`，名称为 `原文件名_YYYYMMDD_UUID.webp`，日期按北京时间计算。去除原扩展名及路径，清理特殊字符，原文件名主体最多保留 80 个字符；每次上传使用新 UUID，不覆盖原对象。`url` 来自 `COS_PUBLIC_BASE_URL`，中文等字符会进行 URL 编码；`objectKey` 和 `url` 指向公告使用的 WebP，`sizeBytes` 和 `contentType` 对应输出对象；`originalName` 保留用户上传的原始文件名。原图按真实后缀留在同一目录，审计同时记录 `sourceObjectKey`。
 
 成功数据：
 
 ```json
 {
   "fileId": "服务端文件 ID",
-  "objectKey": "uploads/2026/09/example.webp",
-  "url": "https://静态资源域名/uploads/2026/09/example.webp",
-  "originalName": "海报.webp",
+  "objectKey": "admin/uploads/海报_20261019_example.webp",
+  "url": "https://cdn.sujiegame.com/admin/uploads/%E6%B5%B7%E6%8A%A5_20261019_example.webp",
+  "originalName": "海报.png",
   "contentType": "image/webp",
   "sizeBytes": 12345
 }
 ```
 
-服务器使用 COS 密钥上传，前端不接触密钥。公告编辑器只保存返回的文件引用。存储未配置返回 `FILE_STORAGE_UNAVAILABLE`，类型不支持返回 `UNSUPPORTED_FILE_TYPE`，超过限制返回 `FILE_TOO_LARGE`。
+服务器使用 COS 密钥上传，前端不接触密钥。公告编辑器只保存返回的文件引用。存储未配置返回 `FILE_STORAGE_UNAVAILABLE`，类型不支持返回 `UNSUPPORTED_FILE_TYPE`，工作流输出未就绪或无法确认时返回 `FILE_PROCESSING_FAILED`（此时原图可能已上传），文件超过限制返回 `FILE_TOO_LARGE`。历史公告图片 URL 不会自动改写。
 
 ## 管理端错误日志
 

@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { basename } from "node:path";
 import type { CosStorageConfig } from "../../config/CosStorageConfig.js";
 import { AdminPermission } from "../admin/AdminAccess.js";
 import type { AdminAuthService } from "../admin/AdminAuthService.js";
 import type { AdminAuditRepository } from "../admin/AdminRepositories.js";
 import { AdminFileError } from "./AdminFileErrors.js";
-import type { FileStorage } from "./FileStorage.js";
+import type { FileStorage, FileStorageMetadata } from "./FileStorage.js";
+import { createUploadObjectKey, uploadOriginalName } from "./UploadObjectKey.js";
 
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
@@ -44,12 +44,21 @@ export class AdminFileService {
     if (!detected) throw new AdminFileError("UNSUPPORTED_FILE_TYPE", "仅支持 JPEG、PNG、WebP 图片", 400);
 
     const fileId = this.createId();
-    const date = new Date(this.now());
-    const objectKey = `uploads/${date.getUTCFullYear()}/${String(date.getUTCMonth() + 1).padStart(2, "0")}/${fileId}.${detected.extension}`;
+    const timestamp = this.now();
+    const sourceObjectKey = createUploadObjectKey(input.filename, timestamp, fileId, detected.extension);
+    const objectKey = createUploadObjectKey(input.filename, timestamp, fileId);
     try {
-      await this.options.storage.upload({ objectKey, body: input.body, contentType: detected.contentType });
+      await this.options.storage.upload({ objectKey: sourceObjectKey, body: input.body, contentType: detected.contentType });
     } catch {
       throw new AdminFileError("FILE_UPLOAD_FAILED", "文件上传失败，请稍后重试", 502);
+    }
+    let metadata: FileStorageMetadata = { contentType: detected.contentType, sizeBytes: input.body.length };
+    if (sourceObjectKey !== objectKey) {
+      try {
+        metadata = await this.options.storage.waitForObject(objectKey);
+      } catch {
+        throw new AdminFileError("FILE_PROCESSING_FAILED", "原图已上传，但尚未确认 WebP 生成，请检查存储桶工作流后重试", 502);
+      }
     }
     const url = `${this.options.storageConfig.publicBaseUrl}/${objectKey.split("/").map(encodeURIComponent).join("/")}`;
     await this.options.audits.append({
@@ -59,20 +68,20 @@ export class AdminFileService {
       requestId: context.requestId,
       ip: context.ip,
       createdAt: this.now(),
-      metadata: { fileId, objectKey, contentType: detected.contentType, sizeBytes: input.body.length },
+      metadata: { fileId, objectKey, sourceObjectKey, contentType: metadata.contentType, sizeBytes: metadata.sizeBytes },
     });
     return {
       fileId,
       objectKey,
       url,
-      originalName: basename(input.filename).slice(0, 255),
-      contentType: detected.contentType,
-      sizeBytes: input.body.length,
+      originalName: uploadOriginalName(input.filename),
+      contentType: metadata.contentType,
+      sizeBytes: metadata.sizeBytes,
     };
   }
 }
 
-function detectImage(buffer: Buffer): { readonly contentType: string; readonly extension: string } | undefined {
+function detectImage(buffer: Buffer): { readonly contentType: string; readonly extension: "jpg" | "png" | "webp" } | undefined {
   if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
     return { contentType: "image/jpeg", extension: "jpg" };
   }

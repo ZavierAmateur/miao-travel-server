@@ -63,10 +63,14 @@ COS_SECRET_ID=腾讯云API密钥ID
 COS_SECRET_KEY=腾讯云API密钥Key
 COS_BUCKET=miao-1487859276
 COS_REGION=ap-guangzhou
-COS_PUBLIC_BASE_URL=https://miao-1487859276.cos.ap-guangzhou.myqcloud.com
+COS_PUBLIC_BASE_URL=https://cdn.sujiegame.com
 ```
 
-当前通用上传接口限制为 JPEG、PNG、WebP，单文件最大 5MB；接口使用管理员 HttpOnly Cookie 鉴权，浏览器不持有 COS 密钥。
+当前通用上传接口接收 JPEG、PNG、WebP，按文件头识别格式，单文件最大 5MB，原始字节直接写入主桶的 `admin/uploads/` 目录。WebP 转换由桶内已配置的工作流负责：同目录、同名替换后缀生成 `.webp`。服务端对 PNG/JPEG 上传检查工作流输出是否已生成，再返回公告使用的 WebP CDN 地址。
+
+对象名为 `原文件名_YYYYMMDD_UUID.webp`，日期按北京时间（Asia/Shanghai）计算。例如 `活动海报.png` 原样上传为 `admin/uploads/活动海报_20261019_唯一ID.png`，工作流输出 `admin/uploads/活动海报_20261019_唯一ID.webp`，公告引用后者。原文件名去扩展名，清理路径、控制字符和特殊符号，最多保留 80 个字符；每次上传生成新的 UUID，更新图片时上传新文件并保存新引用，不覆盖原对象，配合 CDN 的长期不可变缓存。
+
+接口使用管理员 HttpOnly Cookie 鉴权，浏览器不持有 COS 密钥。部署时将 `COS_BUCKET` 指向主桶并把 `COS_PUBLIC_BASE_URL` 设为上述 CDN 根域名，密钥需有主桶 `admin/uploads/*` 的 `cos:PutObject` 和 `cos:HeadObject` 权限。该配置仅影响新上传的 URL，已有公告保存的旧 URL 不会自动迁移。
 
 ## CloudBase Run 部署
 
