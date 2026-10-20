@@ -19,12 +19,33 @@ export class CloudBasePlayerProfileRepository implements PlayerProfileRepository
     }
   }
 
+  async listPendingLeaderboardSync(limit: number, offset: number): Promise<readonly PlayerProfile[]> {
+    const result = await this.collection.where({ leaderboardSyncPending: true })
+      .orderBy("_id", "asc").skip(offset).limit(limit).get();
+    return result.data.flatMap(value => {
+      const document = value as PlayerProfileDocument & { _id?: unknown };
+      return typeof document?._id === "string" ? [{
+        playerId: document._id, nickName: document.nickName, avatarUrl: document.avatarUrl,
+        updatedAt: document.updatedAt, leaderboardSyncPending: true,
+      }] : [];
+    });
+  }
+
+  async markLeaderboardSynced(profile: PlayerProfile): Promise<boolean> {
+    const result = await this.collection.where({
+      _id: profile.playerId, updatedAt: profile.updatedAt,
+      nickName: profile.nickName, avatarUrl: profile.avatarUrl, leaderboardSyncPending: true,
+    }).update({ leaderboardSyncPending: false });
+    return result.updated === 1;
+  }
+
   async save(profile: PlayerProfile): Promise<PlayerProfile> {
     await this.collection.doc(profile.playerId).set({
       nickName: profile.nickName,
       avatarUrl: profile.avatarUrl,
       updatedAt: profile.updatedAt,
+      leaderboardSyncPending: true,
     });
-    return profile;
+    return { ...profile, leaderboardSyncPending: true };
   }
 }

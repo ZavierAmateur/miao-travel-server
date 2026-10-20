@@ -85,6 +85,33 @@ describe("GET/PUT /v1/save", () => {
     });
   });
 
+  it("提示道具数量保存后可恢复，消耗至零后仍可正确恢复", async () => {
+    for (const [index, hintCount] of [7, 0].entries()) {
+      const saved = await app.inject({
+        method: "PUT",
+        url: "/v1/save",
+        headers: { authorization: `Bearer ${token}` },
+        payload: {
+          ...payload,
+          baseRevision: index,
+          idempotencyKey: `hint-save-request-${index}`,
+          save: {
+            ...payload.save,
+            modules: { user: { level: 5, hintCount, bombCount: 99 } },
+          },
+        },
+      });
+      expect(saved.statusCode).toBe(200);
+      const loaded = await app.inject({
+        method: "GET", url: "/v1/save", headers: { authorization: `Bearer ${token}` },
+      });
+      expect(loaded.statusCode).toBe(200);
+      const data = loaded.json<{ data: { revision: number; save: { modules: { user: object } } } }>().data;
+      expect(data.revision).toBe(index + 1);
+      expect(data.save.modules.user).toEqual({ level: 5, hintCount });
+    }
+  });
+
   it("没有 Bearer token 时返回 401", async () => {
     const response = await app.inject({ method: "GET", url: "/v1/save" });
     expect(response.statusCode).toBe(401);
@@ -154,6 +181,8 @@ describe("GET/PUT /v1/save", () => {
       expiresAt: 10_000,
     });
     const failingRepository: CloudSaveRepository = {
+      listPendingLeaderboardSync: () => Promise.resolve([]),
+      markLeaderboardSynced: () => Promise.resolve(false),
       findByPlayerId: () => Promise.reject(new Error("quota exhausted: secret-internal-detail")),
       compareAndSet: () => Promise.reject(new Error("quota exhausted: secret-internal-detail")),
       rollbackPrevious: () => Promise.reject(new Error("quota exhausted: secret-internal-detail")),

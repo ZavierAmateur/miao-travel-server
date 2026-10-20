@@ -10,7 +10,7 @@ import type { CloudSaveRepository } from "../save/CloudSaveRepository.js";
 import type { AdminAuditRepository } from "./AdminRepositories.js";
 import type { AdminIdentity } from "./AdminAuthService.js";
 import type { CloudSaveRecord, CloudSaveSnapshot, JsonValue } from "../save/CloudSave.js";
-import type { LevelLeaderboardProjector } from "../leaderboard/LevelLeaderboardProjector.js";
+import { requestLeaderboardSync, type LeaderboardSyncService } from "../leaderboard/LeaderboardSyncService.js";
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
@@ -21,7 +21,7 @@ export interface AdminPlayerServiceOptions {
   readonly profiles: PlayerProfileRepository;
   readonly saves: CloudSaveRepository;
   readonly audits: AdminAuditRepository;
-  readonly leaderboard?: LevelLeaderboardProjector;
+  readonly leaderboardSync?: Pick<LeaderboardSyncService, "requestSync">;
   readonly now?: () => number;
 }
 
@@ -123,7 +123,7 @@ export class AdminPlayerService {
     if (result.status === "no_previous") {
       throw new AdminPlayerError("SAVE_PREVIOUS_NOT_FOUND", "没有可回滚的上一版本", 409);
     }
-    await this.options.leaderboard?.syncSave(playerId, result.record.save, result.record.serverSavedAt);
+    requestLeaderboardSync(this.options.leaderboardSync);
     await this.options.audits.append({
       id: auditKey,
       adminUserId: identity.id,

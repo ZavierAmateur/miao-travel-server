@@ -53,6 +53,22 @@ export class CloudBaseCloudSaveRepository implements CloudSaveRepository {
     return this.resolveConcurrentWrite(command);
   }
 
+  async listPendingLeaderboardSync(limit: number, offset: number): Promise<readonly CloudSaveRecord[]> {
+    const result = await this.collection.where({ leaderboardSyncPending: true })
+      .orderBy("_id", "asc").skip(offset).limit(limit).get();
+    return result.data.flatMap(value => {
+      const id = (value as { _id?: unknown })?._id;
+      const record = typeof id === "string" ? this.toRecord(id, value) : undefined;
+      return record ? [record] : [];
+    });
+  }
+
+  async markLeaderboardSynced(playerId: string, revision: number): Promise<boolean> {
+    const result = await this.collection.where({ _id: playerId, revision, leaderboardSyncPending: true })
+      .update({ leaderboardSyncPending: false });
+    return result.updated === 1;
+  }
+
   async rollbackPrevious(command: RollbackCloudSaveCommand): Promise<RollbackCloudSaveResult> {
     const current = await this.findByPlayerId(command.playerId);
     if (!current || current.revision !== command.expectedRevision) {
@@ -71,6 +87,7 @@ export class CloudBaseCloudSaveRepository implements CloudSaveRepository {
       save: source.save,
       lastIdempotencyKey: `admin-rollback:${command.auditKey}`,
       lastRequestHash: `admin-rollback:${command.auditKey}`,
+      leaderboardSyncPending: true,
       previous: toSnapshot(current),
     };
     const result = await this.collection.where({
@@ -119,6 +136,7 @@ export class CloudBaseCloudSaveRepository implements CloudSaveRepository {
       save: command.save,
       lastIdempotencyKey: command.idempotencyKey,
       lastRequestHash: command.requestHash,
+      leaderboardSyncPending: true,
       ...(current ? { previous: toSnapshot(current) } : {}),
     };
   }
@@ -134,6 +152,7 @@ export class CloudBaseCloudSaveRepository implements CloudSaveRepository {
       save: record.save,
       lastIdempotencyKey: record.lastIdempotencyKey,
       lastRequestHash: record.lastRequestHash,
+      leaderboardSyncPending: record.leaderboardSyncPending === true,
       ...(record.previous ? { previous: record.previous } : {}),
     };
   }
@@ -150,6 +169,7 @@ export class CloudBaseCloudSaveRepository implements CloudSaveRepository {
       save: this.databaseCommand.set(record.save) as CloudSaveRecord["save"],
       lastIdempotencyKey: record.lastIdempotencyKey,
       lastRequestHash: record.lastRequestHash,
+      leaderboardSyncPending: record.leaderboardSyncPending === true,
       ...(record.previous
         ? { previous: this.databaseCommand.set(record.previous) as NonNullable<CloudSaveRecord["previous"]> }
         : {}),
@@ -171,6 +191,7 @@ export class CloudBaseCloudSaveRepository implements CloudSaveRepository {
       save: document.save,
       lastIdempotencyKey: document.lastIdempotencyKey,
       lastRequestHash: document.lastRequestHash,
+      leaderboardSyncPending: document.leaderboardSyncPending === true,
       ...(document.previous ? { previous: document.previous } : {}),
     };
   }

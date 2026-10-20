@@ -3,6 +3,7 @@ export interface PlayerProfile {
   readonly nickName: string;
   readonly avatarUrl: string;
   readonly updatedAt: number;
+  readonly leaderboardSyncPending?: boolean;
 }
 
 export interface PutPlayerProfileInput {

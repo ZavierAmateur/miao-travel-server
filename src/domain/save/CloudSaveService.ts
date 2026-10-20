@@ -4,13 +4,13 @@ import type { CloudSaveRepository } from "./CloudSaveRepository.js";
 import { CloudSaveConflictError } from "./CloudSaveErrors.js";
 import { validateCloudSaveInput, type PutCloudSaveInput } from "./CloudSaveValidation.js";
 import type { PlayerRepository } from "../player/PlayerRepository.js";
-import type { LevelLeaderboardProjector } from "../leaderboard/LevelLeaderboardProjector.js";
+import { requestLeaderboardSync, type LeaderboardSyncService } from "../leaderboard/LeaderboardSyncService.js";
 
 export interface CloudSaveServiceOptions {
   readonly sessions: SessionRepository;
   readonly saves: CloudSaveRepository;
   readonly players?: PlayerRepository;
-  readonly leaderboard?: LevelLeaderboardProjector;
+  readonly leaderboardSync?: Pick<LeaderboardSyncService, "requestSync">;
   readonly now?: () => number;
 }
 
@@ -50,7 +50,7 @@ export class CloudSaveService {
         hash: current.hash,
       } : undefined);
     }
-    await this.options.leaderboard?.syncSave(playerId, result.record.save, result.record.serverSavedAt);
+    requestLeaderboardSync(this.options.leaderboardSync);
     return {
       revision: result.record.revision,
       serverSavedAt: result.record.serverSavedAt,

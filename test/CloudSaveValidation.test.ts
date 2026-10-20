@@ -57,6 +57,17 @@ describe("云存档输入校验", () => {
     expect(validated.save.modules.user).toEqual({ level: 3, energy: 9 });
   });
 
+  it.each([7, 0])("保留提示道具数量 %i，并过滤废弃的 bombCount", (hintCount) => {
+    const validated = validateCloudSaveInput({
+      ...validInput(),
+      save: {
+        ...validInput().save,
+        modules: { user: { level: 3, hintCount, bombCount: 99 } },
+      },
+    });
+    expect(validated.save.modules.user).toEqual({ level: 3, hintCount });
+  });
+
   it("删除旧宠物ID并只保留现行宠物持有记录", () => {
     const validated = validateCloudSaveInput({
       ...validInput(),

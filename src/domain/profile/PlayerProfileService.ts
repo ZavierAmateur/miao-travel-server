@@ -4,13 +4,13 @@ import type { PutPlayerProfileInput } from "./PlayerProfile.js";
 import type { PlayerProfileRepository } from "./PlayerProfileRepository.js";
 import { validatePlayerProfile } from "./PlayerProfileValidation.js";
 import type { PlayerRepository } from "../player/PlayerRepository.js";
-import type { LevelLeaderboardProjector } from "../leaderboard/LevelLeaderboardProjector.js";
+import { requestLeaderboardSync, type LeaderboardSyncService } from "../leaderboard/LeaderboardSyncService.js";
 
 export interface PlayerProfileServiceOptions {
   readonly sessions: SessionRepository;
   readonly profiles: PlayerProfileRepository;
   readonly players?: PlayerRepository;
-  readonly leaderboard?: LevelLeaderboardProjector;
+  readonly leaderboardSync?: Pick<LeaderboardSyncService, "requestSync">;
   readonly now?: () => number;
 }
 
@@ -42,7 +42,7 @@ export class PlayerProfileService {
       ...validatePlayerProfile(input),
       updatedAt: this.now(),
     });
-    await this.options.leaderboard?.syncProfile(profile);
+    requestLeaderboardSync(this.options.leaderboardSync);
     return {
       nickName: profile.nickName,
       avatarUrl: profile.avatarUrl,

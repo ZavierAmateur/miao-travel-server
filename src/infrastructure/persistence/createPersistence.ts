@@ -80,7 +80,7 @@ export function createPersistence(config: AppConfig): Promise<Persistence> {
     adminAudits: new CloudBaseAdminAuditRepository(database.collection("admin_audit_logs")),
     adminErrorLogs: new CloudBaseAdminErrorLogRepository(database.collection("admin_error_logs")),
     announcements: new CloudBaseAnnouncementRepository(database.collection("announcements")),
-    levelLeaderboard: new CloudBaseLevelLeaderboardRepository(database.collection("level_leaderboard")),
+    levelLeaderboard: new CloudBaseLevelLeaderboardRepository(database.collection("level_leaderboard"), database),
     close: () => Promise.resolve(),
   });
 }

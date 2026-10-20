@@ -8,6 +8,10 @@ export interface CloudBaseGetResult extends CloudBaseResult {
   readonly data: unknown[];
 }
 
+export interface CloudBaseCountResult extends CloudBaseResult {
+  readonly total: number;
+}
+
 export interface CloudBaseUpdateResult extends CloudBaseResult {
   readonly updated: number;
 }
@@ -23,6 +27,7 @@ export interface CloudBaseDocumentReference {
 }
 
 export interface CloudBaseQueryReference {
+  count(): Promise<CloudBaseCountResult>;
   get(): Promise<CloudBaseGetResult>;
   update(data: object): Promise<CloudBaseUpdateResult>;
   limit(count: number): CloudBaseQueryReference;
@@ -30,14 +35,24 @@ export interface CloudBaseQueryReference {
   orderBy(field: string, orderType: "desc" | "asc"): CloudBaseQueryReference;
 }
 
+export interface CloudBaseAggregateReference {
+  match(query: object): CloudBaseAggregateReference;
+  bucket(options: { readonly groupBy: string; readonly boundaries: readonly string[]; readonly output: object }): CloudBaseAggregateReference;
+  end(): Promise<CloudBaseGetResult>;
+}
+
 export interface CloudBaseCollectionReference {
+  aggregate(): CloudBaseAggregateReference;
   doc(id: string): CloudBaseDocumentReference;
   add(data: object): Promise<CloudBaseResult>;
   where(query: object): CloudBaseQueryReference;
 }
 
 export interface CloudBaseDatabase {
-  readonly command: CloudBaseCommand;
+  readonly command: CloudBaseCommand & {
+    lt(value: string | number): unknown;
+  };
+  RegExp(options: { readonly regexp: string; readonly options?: string }): unknown;
   collection(name: string): CloudBaseCollectionReference;
   createCollection?(name: string): Promise<CloudBaseResult>;
 }

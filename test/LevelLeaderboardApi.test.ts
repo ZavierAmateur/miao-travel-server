@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { LeaderboardSyncService } from "../src/domain/leaderboard/LeaderboardSyncService.js";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { createHash } from "node:crypto";
 import { buildApp } from "../src/app.js";
@@ -15,8 +16,6 @@ import { InMemorySessionRepository } from "../src/infrastructure/repositories/In
 import { InMemoryCloudSaveRepository } from "../src/infrastructure/repositories/InMemoryCloudSaveRepository.js";
 import { CloudSaveService } from "../src/domain/save/CloudSaveService.js";
 import { PlayerProfileService } from "../src/domain/profile/PlayerProfileService.js";
-import { CloudBaseLevelLeaderboardRepository } from "../src/infrastructure/repositories/CloudBaseLevelLeaderboardRepository.js";
-import type { CloudBaseCollectionReference, CloudBaseQueryReference } from "../src/infrastructure/persistence/CloudBaseDatabase.js";
 
 const config: AppConfig = {
   environment: AppEnvironment.Test, host: "127.0.0.1", port: 3000,
@@ -202,8 +201,9 @@ describe("闯关榜投影", () => {
       playerId: "player-2", createdAt: 1, expiresAt: 10_000,
     });
     const projector = new LevelLeaderboardProjector({ players, profiles, leaderboard });
-    const cloudSaves = new CloudSaveService({ sessions, saves, players, leaderboard: projector, now: () => 2_000 });
-    const playerProfiles = new PlayerProfileService({ sessions, profiles, players, leaderboard: projector, now: () => 2_100 });
+    const sync = new LeaderboardSyncService({ saves, profiles, projector });
+    const cloudSaves = new CloudSaveService({ sessions, saves, players, now: () => 2_000 });
+    const playerProfiles = new PlayerProfileService({ sessions, profiles, players, now: () => 2_100 });
 
     await cloudSaves.put(`Bearer ${token}`, {
       baseRevision: 0,
@@ -212,46 +212,16 @@ describe("闯关榜投影", () => {
       idempotencyKey: "leaderboard-save-1",
       save: { version: "1.0.0", serialized: 1, time: 1_900, modules: { user: { level: 12 } } },
     });
+    await sync.runOnce();
     await expect(leaderboard.findByPlayerId("player-2")).resolves.toMatchObject({ level: 12, nickName: "" });
 
     await playerProfiles.put(`Bearer ${token}`, {
       nickName: "云朵旅行者",
       avatarUrl: "https://example.com/cloud.png",
     });
+    await sync.runOnce();
     await expect(leaderboard.findByPlayerId("player-2")).resolves.toMatchObject({
       level: 12, nickName: "云朵旅行者", avatarUrl: "https://example.com/cloud.png",
     });
-  });
-});
-
-describe("CloudBase闯关榜筛选", () => {
-  it("跨批次扫描筛选结果并保留全榜名次", async () => {
-    const documents = Array.from({ length: 130 }, (_, index) => ({
-      playerId: `player-${String(index + 1).padStart(3, "0")}`,
-      platform: index % 2 === 0 ? "wechat" : "bytedance",
-      level: 200 - index,
-      nickName: index === 119 ? "目标旅行猫" : `旅行者${index + 1}`,
-      avatarUrl: "",
-      reachedAt: 1_000 + index,
-      scoreUpdatedAt: 1_000 + index,
-      updatedAt: 1_000 + index,
-      sortKey: String(index),
-    }));
-    let offset = 0;
-    let limit = 100;
-    const get = vi.fn(() => Promise.resolve({ requestId: "query", data: documents.slice(offset, offset + limit) }));
-    const query = {
-      orderBy: vi.fn(() => query),
-      skip: vi.fn((value: number) => { offset = value; return query; }),
-      limit: vi.fn((value: number) => { limit = value; return query; }),
-      get,
-    } as unknown as CloudBaseQueryReference;
-    const collection = { where: vi.fn(() => query) } as unknown as CloudBaseCollectionReference;
-    const repository = new CloudBaseLevelLeaderboardRepository(collection);
-
-    const result = await repository.list({ offset: 0, limit: 21, playerId: "player-120", nickName: "旅行猫" });
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ rank: 120, entry: { playerId: "player-120" } });
-    expect(get).toHaveBeenCalledTimes(2);
   });
 });

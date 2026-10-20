@@ -190,7 +190,7 @@
 V1 `modules.user` 字段白名单固定为：
 
 ```text
-saveTime, undoCount, refreshCount, bombCount, winnerStreakCount,
+saveTime, undoCount, refreshCount, hintCount, winnerStreakCount,
 todaySuccessCount, animals, todayVideoForEnergyCount, sevenSignProgress,
 sevenSignTodayState, levelMaxProgress, subscribeStae, adFreeCount, level,
 energy, energyTimer, energyInfinite,
@@ -251,6 +251,10 @@ todayAdReliveCount
 ```
 
 榜单按当前到达关卡降序排列，同关卡按首次达到当前关卡的服务端时间升序排列。筛选结果中的 `rank` 仍是玩家在未筛选全榜中的真实名次。排行榜数据来自云存档 `save.modules.user.level` 的轻量投影；昵称头像来自独立玩家资料。云存档回滚后会同步回退榜单关卡。
+
+查询不会再从榜首逐批下载记录：无筛选直接按页读取；精确用户 ID 直接读取对应文档；平台和昵称在数据库中组合筛选后分页。筛选后的全榜名次通过排序键区间聚合一次计算，单条结果用计数计算，不逐用户查询名次。每页仍读取最多 21 条候选判断 `hasMore`，接口响应及昵称字面包含、忽略大小写语义保持一致。
+
+排行榜为异步投影：云存档、玩家资料或后台回滚写入成功后，接口即返回成功，不等待排行榜数据库。主记录同时保存内部 `leaderboardSyncPending` 标记（不进入客户端存档、哈希和响应）；后台任务在成功投影后按存档版本或资料内容确认清除。排行榜故障、确认写入失败或服务重启时，标记保留并继续补偿。读取榜单可能短暂滞后于刚保存的关卡或头像。
 
 部署时需先创建 `level_leaderboard` 集合；已有云存档可执行 `npm run leaderboard:backfill:wechat` 一次性回填。游戏前端不调用本接口。
 

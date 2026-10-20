@@ -28,10 +28,25 @@ export class InMemoryCloudSaveRepository implements CloudSaveRepository {
       save: command.save,
       lastIdempotencyKey: command.idempotencyKey,
       lastRequestHash: command.requestHash,
+      leaderboardSyncPending: true,
       ...(current ? { previous: toSnapshot(current) } : {}),
     };
     this.records.set(command.playerId, record);
     return Promise.resolve({ status: "saved", record });
+  }
+
+  listPendingLeaderboardSync(limit: number, offset: number): Promise<readonly CloudSaveRecord[]> {
+    return Promise.resolve([...this.records.values()]
+      .filter(record => record.leaderboardSyncPending)
+      .sort((a, b) => a.playerId.localeCompare(b.playerId))
+      .slice(offset, offset + limit));
+  }
+
+  markLeaderboardSynced(playerId: string, revision: number): Promise<boolean> {
+    const current = this.records.get(playerId);
+    if (!current?.leaderboardSyncPending || current.revision !== revision) return Promise.resolve(false);
+    this.records.set(playerId, { ...current, leaderboardSyncPending: false });
+    return Promise.resolve(true);
   }
 
   rollbackPrevious(command: RollbackCloudSaveCommand): Promise<RollbackCloudSaveResult> {
@@ -52,6 +67,7 @@ export class InMemoryCloudSaveRepository implements CloudSaveRepository {
       save: source.save,
       lastIdempotencyKey: `admin-rollback:${command.auditKey}`,
       lastRequestHash: `admin-rollback:${command.auditKey}`,
+      leaderboardSyncPending: true,
       previous: toSnapshot(current),
     };
     this.records.set(command.playerId, record);

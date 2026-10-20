@@ -232,7 +232,7 @@ describe("CloudBaseAdminRepositories", () => {
 });
 
 describe("CloudBasePlayerProfileRepository", () => {
-  it("以 playerId 为文档主键，且只保存昵称、头像地址和更新时间", async () => {
+  it("以 playerId 为文档主键，将待同步标记与资料一起保存", async () => {
     const set = vi.fn().mockResolvedValue({ requestId: "profile-write" });
     const { collection, doc } = collectionWithDocument({ set });
     const repository = new CloudBasePlayerProfileRepository(collection);
@@ -249,6 +249,7 @@ describe("CloudBasePlayerProfileRepository", () => {
       nickName: "旅行猫",
       avatarUrl: "https://example.com/avatar.png",
       updatedAt: 2_000,
+      leaderboardSyncPending: true,
     });
   });
 

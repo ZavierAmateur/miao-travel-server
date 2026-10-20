@@ -15,6 +15,7 @@ import { loadCosStorageConfig } from "./config/CosStorageConfig.js";
 import { AdminFileService } from "./domain/file/AdminFileService.js";
 import { CosFileStorage } from "./infrastructure/storage/CosFileStorage.js";
 import { LevelLeaderboardProjector } from "./domain/leaderboard/LevelLeaderboardProjector.js";
+import { LeaderboardSyncService } from "./domain/leaderboard/LeaderboardSyncService.js";
 import { AdminLeaderboardService } from "./domain/leaderboard/AdminLeaderboardService.js";
 
 const config = loadConfig();
@@ -31,18 +32,24 @@ const levelLeaderboardProjector = new LevelLeaderboardProjector({
   players: persistence.players,
   profiles: persistence.profiles,
 });
+const leaderboardSync = new LeaderboardSyncService({
+  saves: persistence.saves,
+  profiles: persistence.profiles,
+  projector: levelLeaderboardProjector,
+  onError: failure => app.log.warn(failure, "排行榜同步失败，保留待同步标记"),
+});
 const cloudSaveService = new CloudSaveService({
   sessions: persistence.sessions,
   saves: persistence.saves,
   players: persistence.players,
-  leaderboard: levelLeaderboardProjector,
+  leaderboardSync,
 });
 const bootstrapConfigService = new BootstrapConfigService(persistence.bootstrapConfigs);
 const playerProfileService = new PlayerProfileService({
   sessions: persistence.sessions,
   profiles: persistence.profiles,
   players: persistence.players,
-  leaderboard: levelLeaderboardProjector,
+  leaderboardSync,
 });
 const adminAuthConfig = loadAdminAuthConfig();
 const adminAuthService = adminAuthConfig.enabled
@@ -69,7 +76,7 @@ const adminPlayerService = adminAuthService
       profiles: persistence.profiles,
       saves: persistence.saves,
       audits: persistence.adminAudits,
-      leaderboard: levelLeaderboardProjector,
+      leaderboardSync,
     })
   : undefined;
 const adminErrorLogService = adminAuthService
@@ -103,6 +110,9 @@ const app = buildApp({
   ...(adminLeaderboardService ? { adminLeaderboardService } : {}),
   ...(adminFileService ? { adminFileService } : {}),
 });
+
+app.addHook("onReady", done => { leaderboardSync.start(); done(); });
+app.addHook("onClose", async () => { await leaderboardSync.stop(); });
 
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, "开始优雅关闭服务");

@@ -25,7 +25,7 @@ const database = app.database({
   database: config.cloudDatabaseName,
 }) as CloudBaseDatabase;
 const projector = new LevelLeaderboardProjector({
-  leaderboard: new CloudBaseLevelLeaderboardRepository(database.collection("level_leaderboard")),
+  leaderboard: new CloudBaseLevelLeaderboardRepository(database.collection("level_leaderboard"), database),
   players: new CloudBasePlayerRepository(database.collection("players")),
   profiles: new CloudBasePlayerProfileRepository(database.collection("player_profiles")),
 });

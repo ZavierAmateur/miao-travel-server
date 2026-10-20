@@ -12,7 +12,7 @@ export const V1_CLOUD_PLAYER_FIELDS = [
   "saveTime",
   "undoCount",
   "refreshCount",
-  "bombCount",
+  "hintCount",
   "winnerStreakCount",
   "todaySuccessCount",
   "animals",

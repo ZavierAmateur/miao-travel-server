@@ -23,6 +23,7 @@ export interface CloudSaveRecord extends CloudSaveSnapshot {
   readonly lastIdempotencyKey: string;
   readonly lastRequestHash: string;
   readonly previous?: CloudSaveSnapshot;
+  readonly leaderboardSyncPending?: boolean;
 }
 
 export interface PutCloudSaveCommand {
