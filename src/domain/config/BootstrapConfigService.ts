@@ -34,6 +34,7 @@ export class BootstrapConfigService {
         message: config.maintenanceMessage,
       },
       minimumClientVersion: config.minimumClientVersion,
+      latestClientVersion: config.latestClientVersion ?? "",
       features: {
         cloudSaveEnabled: config.cloudSaveEnabled,
       },

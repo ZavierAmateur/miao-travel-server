@@ -24,7 +24,7 @@ export interface AdminAuditLog {
   readonly id: string;
   readonly adminUserId: string;
   readonly action: "admin.login" | "admin.logout" | "player.ban" | "player.unban" | "save.rollback"
-    | "announcement.create" | "announcement.update" | "announcement.delete" | "file.upload";
+    | "project.version.update" | "announcement.create" | "announcement.update" | "announcement.delete" | "file.upload";
   readonly requestId: string;
   readonly ip: string;
   readonly createdAt: number;

@@ -2,6 +2,7 @@ export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 
 export interface CloudSavePayload {
+  readonly generation?: string;
   readonly version: string;
   readonly serialized: 0 | 1;
   readonly time: number;

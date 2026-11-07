@@ -59,7 +59,7 @@ function fixture(rows: Document[]) {
     }),
     add:()=>Promise.resolve({requestId:"unused"}),
     where:filter=>{
-      const candidate=()=>[...stored.values()].filter(row=>Object.entries(filter).every(([key,value])=>matches((row as unknown as Record<string,unknown>)[key],value))).sort((a,b)=>a.sortKey<b.sortKey?-1:a.sortKey>b.sortKey?1:0);
+      const candidate=()=>[...stored.values()].filter(row=>Object.entries(filter).every(([key,value])=>matches(key === "_id" ? row.playerId : (row as unknown as Record<string,unknown>)[key],value))).sort((a,b)=>a.sortKey<b.sortKey?-1:a.sortKey>b.sortKey?1:0);
       let offset=0,limit=Infinity;
       const query:CloudBaseQueryReference={
         get:()=>{const data=candidate().slice(offset,offset+limit);stats.fetches.push({filter,offset,limit,returned:data.length});return Promise.resolve({requestId:"get",data});},
@@ -67,7 +67,7 @@ function fixture(rows: Document[]) {
           stats.counts++;if(stats.countError)return Promise.reject(stats.countError);
           const total=candidate().length;stats.countedRows+=total;return Promise.resolve({requestId:"count",total});
         },
-        update:()=>Promise.resolve({requestId:"unused",updated:0}),
+        update:data=>{const rows=candidate();for(const row of rows)Object.assign(row,data);return Promise.resolve({requestId:"update",updated:rows.length});},
         orderBy:()=>query,skip:value=>{offset=value;return query;},limit:value=>{limit=value;return query;},
       };
       return query;

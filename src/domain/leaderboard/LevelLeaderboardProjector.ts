@@ -7,6 +7,8 @@ import type { LevelLeaderboardRepository } from "./LevelLeaderboardRepository.js
 export const MAX_LEADERBOARD_LEVEL = 1_000_000;
 
 export interface LevelLeaderboardProjectorOptions {
+  readonly requiredGeneration?: string;
+  readonly requiredProgressVersion?: string;
   readonly leaderboard: LevelLeaderboardRepository;
   readonly players: PlayerRepository;
   readonly profiles: PlayerProfileRepository;
@@ -17,6 +19,10 @@ export class LevelLeaderboardProjector {
   constructor(private readonly options: LevelLeaderboardProjectorOptions) {}
 
   async syncSave(playerId: string, save: CloudSavePayload, serverSavedAt: number): Promise<void> {
+    if (this.options.requiredGeneration && save.generation !== this.options.requiredGeneration) return;
+    const user = save.modules.user;
+    if (this.options.requiredProgressVersion && (typeof user !== "object" || user === null || Array.isArray(user)
+      || user.levelProgressVersion !== this.options.requiredProgressVersion)) return;
     const level = readLevel(save);
     if (level === undefined) return;
     const [player, profile] = await Promise.all([

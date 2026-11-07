@@ -3,6 +3,7 @@ export interface BootstrapConfigRecord {
   readonly maintenanceEnabled: boolean;
   readonly maintenanceMessage: string;
   readonly minimumClientVersion: string;
+  readonly latestClientVersion?: string;
   readonly cloudSaveEnabled: boolean;
   readonly updatedAt: number;
   readonly updatedBy: string;
@@ -15,6 +16,7 @@ export interface BootstrapConfigData {
     readonly message: string;
   };
   readonly minimumClientVersion: string;
+  readonly latestClientVersion: string;
   readonly features: {
     readonly cloudSaveEnabled: boolean;
   };
@@ -26,6 +28,7 @@ export const DEFAULT_BOOTSTRAP_CONFIG: BootstrapConfigRecord = Object.freeze({
   maintenanceEnabled: false,
   maintenanceMessage: "",
   minimumClientVersion: "",
+  latestClientVersion: "",
   cloudSaveEnabled: true,
   updatedAt: 0,
   updatedBy: "system-default",
@@ -43,6 +46,20 @@ export function validateBootstrapConfigRecord(value: BootstrapConfigRecord): Boo
   }
   if (typeof value.minimumClientVersion !== "string" || value.minimumClientVersion.length > 64) {
     throw new Error("minimumClientVersion 必须是不超过 64 字符的字符串");
+  }
+  const latest = value.latestClientVersion === undefined ? "" : value.latestClientVersion;
+  for (const [field, version] of [["minimumClientVersion", value.minimumClientVersion], ["latestClientVersion", latest]]) {
+    if (typeof version !== "string" || (version !== "" && (!/^\d+\.\d+\.\d+$/.test(version)
+      || !version.split(".").map(Number).every(Number.isSafeInteger)))) {
+      throw new Error(`${field} 必须为空或三段数字版本，如 1.2.0`);
+    }
+  }
+  if (latest && value.minimumClientVersion) {
+    const left = latest.split(".").map(Number), right = value.minimumClientVersion.split(".").map(Number);
+    for (let index = 0; index < 3; index++) {
+      if (left[index]! < right[index]!) throw new Error("最低版本不能高于最新版本");
+      if (left[index]! > right[index]!) break;
+    }
   }
   if (typeof value.cloudSaveEnabled !== "boolean") {
     throw new Error("cloudSaveEnabled 必须是布尔值");

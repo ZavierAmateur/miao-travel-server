@@ -10,7 +10,7 @@ export class SessionAuthenticationError extends Error {
 
 export class CloudSaveValidationError extends Error {
   constructor(
-    readonly code: "INVALID_SAVE" | "SAVE_TOO_LARGE",
+    readonly code: "INVALID_SAVE" | "SAVE_TOO_LARGE" | "SAVE_GENERATION_MISMATCH" | "SAVE_PROGRESS_VERSION_MISMATCH",
     message: string,
   ) {
     super(message);

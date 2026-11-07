@@ -1,0 +1,64 @@
+{
+  "recordedAt": "2026-11-05T20:20:57+08:00",
+  "service": "miao-travel-wechat",
+  "deployedVersion": "miao-travel-wechat-026",
+  "trafficPercent": 100,
+  "generation": "mixed99-20261105",
+  "firstPlayableLevel": 6,
+  "targetFingerprint": "a6df0953637191fcfd7189f2335b32a0a9822f5e2d0905576523922f5642a2f6",
+  "reset": {
+    "mode": "apply",
+    "generation": "mixed99-20261105",
+    "before": {
+      "cloud_saves": 7,
+      "level_leaderboard": 7
+    },
+    "removed": {
+      "cloud_saves": 7,
+      "level_leaderboard": 7
+    },
+    "after": {
+      "cloud_saves": 0,
+      "level_leaderboard": 0
+    },
+    "target": "a6df0953637191fcfd7189f2335b32a0a9822f5e2d0905576523922f5642a2f6"
+  },
+  "beforeCounts": {
+    "cloud_saves": 7,
+    "level_leaderboard": 7,
+    "players": 7,
+    "sessions": 445,
+    "player_profiles": 3,
+    "remote_configs": 1,
+    "announcements": 2
+  },
+  "afterCounts": {
+    "cloud_saves": 0,
+    "level_leaderboard": 0,
+    "players": 7,
+    "sessions": 445,
+    "player_profiles": 3,
+    "remote_configs": 1,
+    "announcements": 2
+  },
+  "preservedCollections": [
+    "players",
+    "sessions",
+    "player_profiles",
+    "remote_configs",
+    "announcements"
+  ],
+  "healthRequestId": "9c940751-e12e-406a-a1a8-58d5944505b4",
+  "clientDelivery": "source and local preview only; no WeChat client release performed",
+  "gitDelivery": "working tree only; not committed or pushed this round",
+  "delayedVerificationCounts": {
+    "cloud_saves": 0,
+    "level_leaderboard": 0,
+    "players": 7,
+    "sessions": 445,
+    "player_profiles": 3,
+    "remote_configs": 1,
+    "announcements": 2
+  },
+  "finalHealthRequestId": "a0b3a088-9e2e-461e-b432-7a7ffd8803ba"
+}

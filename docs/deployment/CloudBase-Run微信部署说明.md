@@ -101,7 +101,7 @@ BOOTSTRAP_CLOUD_SAVE_ENABLED=true \
 npm run bootstrap:publish:wechat
 ```
 
-可选变量：`BOOTSTRAP_MAINTENANCE_MESSAGE`、`BOOTSTRAP_MINIMUM_CLIENT_VERSION`。命令不会输出 CloudBase API Key；不要把 `.env.wechat.local` 或命令行凭据提交到 Git。
+可选变量：`BOOTSTRAP_MAINTENANCE_MESSAGE`、`BOOTSTRAP_MINIMUM_CLIENT_VERSION`、`BOOTSTRAP_LATEST_CLIENT_VERSION`。版本必须为三段非负安全整数，最低版本不能高于最新版本；两个字段均可显式设置为空字符串。先用 `npm run bootstrap:publish:wechat -- --dry-run` 只读预览（不创建集合、不写配置），确认新包已可获取后再发布。命令不会输出 CloudBase API Key；不要把 `.env.wechat.local` 或命令行凭据提交到 Git。
 
 ## 8. 玩家头像昵称资料
 

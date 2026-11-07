@@ -1,3 +1,5 @@
+import {migrateProgressSnapshot} from "../../domain/save/ProgressOnlyReset.js";
+import {mergeStoredCloudSave} from "../../domain/save/MergeCloudSave.js";
 import type { CloudSaveRecord, CloudSaveSnapshot, PutCloudSaveCommand, PutCloudSaveResult, RollbackCloudSaveCommand, RollbackCloudSaveResult } from "../../domain/save/CloudSave.js";
 import type { CloudSaveRepository } from "../../domain/save/CloudSaveRepository.js";
 
@@ -17,6 +19,7 @@ export class InMemoryCloudSaveRepository implements CloudSaveRepository {
     if ((current?.revision ?? 0) !== command.baseRevision) {
       return Promise.resolve({ status: "conflict", ...(current ? { current } : {}) });
     }
+    command = mergeStoredCloudSave(command, current?.save);
     const record: CloudSaveRecord = {
       playerId: command.playerId,
       revision: command.baseRevision + 1,
@@ -55,7 +58,8 @@ export class InMemoryCloudSaveRepository implements CloudSaveRepository {
       return Promise.resolve({ status: "conflict", ...(current ? { current } : {}) });
     }
     if (!current.previous) return Promise.resolve({ status: "no_previous", current });
-    const source = current.previous;
+    // 部署与批量迁移间隙也不能让历史 previous 复活旧进度。
+    const source = migrateProgressSnapshot(current.previous);
     const record: CloudSaveRecord = {
       playerId: current.playerId,
       revision: current.revision + 1,

@@ -43,13 +43,12 @@ export class CloudBaseLevelLeaderboardRepository implements LevelLeaderboardRepo
   async updateProfile(playerId: string, profile: { readonly nickName: string; readonly avatarUrl: string; readonly updatedAt: number }): Promise<void> {
     const current = await this.findByPlayerId(playerId);
     if (!current) return;
-    const updated: LevelLeaderboardEntry = {
-      ...current,
+    // 条件局部更新不创建文档，也不把读取到的旧关卡写回；清档或新分数并发时安全失效。
+    await this.collection.where({ _id: playerId, updatedAt: current.updatedAt }).update({
       nickName: profile.nickName,
       avatarUrl: profile.avatarUrl,
       updatedAt: Math.max(current.updatedAt, profile.updatedAt),
-    };
-    await this.collection.doc(playerId).set(toDocument(updated));
+    });
   }
 
   async list(query: LevelLeaderboardListQuery): Promise<readonly RankedLevelLeaderboardEntry[]> {

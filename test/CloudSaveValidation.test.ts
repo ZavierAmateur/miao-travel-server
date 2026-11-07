@@ -54,7 +54,7 @@ describe("云存档输入校验", () => {
         },
       },
     });
-    expect(validated.save.modules.user).toEqual({ level: 3, energy: 9 });
+    expect(validated.save.modules.user).toEqual({ level: 3, energy: 9, todayPlayCount: 8 });
   });
 
   it.each([7, 0])("保留提示道具数量 %i，并过滤废弃的 bombCount", (hintCount) => {
@@ -68,7 +68,7 @@ describe("云存档输入校验", () => {
     expect(validated.save.modules.user).toEqual({ level: 3, hintCount });
   });
 
-  it("删除旧宠物ID并只保留现行宠物持有记录", () => {
+  it("正常云保存保留全部宠物资产，独立维护工具负责显式清理", () => {
     const validated = validateCloudSaveInput({
       ...validInput(),
       save: {
@@ -89,7 +89,10 @@ describe("云存档输入校验", () => {
     });
     expect(validated.save.modules.user).toEqual({
       animals: [
-        { id: 50100, getTime: 18, using: 1 },
+        { id: 50008, getTime: 12, using: 1, unlock: 1, stars: 20, ads: 3 },
+        { id: 50009, getTime: 15, using: 0, unlock: 0, stars: 8, ads: 1 },
+        { id: 50105, getTime: 16, using: 1 },
+        { id: 50100, getTime: 18, using: 1, stars: 99 },
       ],
     });
   });

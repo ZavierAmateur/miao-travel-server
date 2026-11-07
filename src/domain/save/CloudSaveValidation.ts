@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import type { CloudSavePayload, JsonValue } from "./CloudSave.js";
 import { CloudSaveValidationError } from "./CloudSaveErrors.js";
 import { MAX_LEADERBOARD_LEVEL } from "../leaderboard/LevelLeaderboardProjector.js";
-import { normalizeCurrentPetRecords } from "./PetSaveCleanup.js";
 
 export const MAX_SAVE_BYTES = 512 * 1024;
 const MAX_DEPTH = 32;
@@ -15,11 +14,15 @@ export const V1_CLOUD_PLAYER_FIELDS = [
   "hintCount",
   "winnerStreakCount",
   "todaySuccessCount",
+  "totalPlayCount",
+  "todayPlayCount",
+  "todayNormalPlayCount",
   "animals",
   "todayVideoForEnergyCount",
   "sevenSignProgress",
   "sevenSignTodayState",
   "levelMaxProgress",
+  "levelProgressVersion",
   "subscribeStae",
   "adFreeCount",
   "level",
@@ -90,6 +93,9 @@ export function validateCloudSaveInput(input: PutCloudSaveInput): ValidatedCloud
 
 function validatePayload(value: unknown): CloudSavePayload {
   if (!isPlainObject(value)) throw invalid("save 必须是对象");
+  if (value.generation !== undefined && (typeof value.generation !== "string" || value.generation.length < 1 || value.generation.length > 128)) {
+    throw invalid("save.generation 长度必须为1–128");
+  }
   if (typeof value.version !== "string" || value.version.length < 1 || value.version.length > 64) {
     throw invalid("save.version 长度必须为 1-64");
   }
@@ -111,8 +117,9 @@ function validatePayload(value: unknown): CloudSavePayload {
 
   const counter = { value: 0 };
   validateJsonValue(value.modules, 0, counter);
-  // 兼容旧客户端传入五模块，但服务端只持久化 V1 产品范围内的 user。
+  // 新请求只接管 V1 user 白名单；仓储 CAS 合并保留已有的其他模块和省略资产。
   return normalizeV1CloudSavePayload({
+    ...(typeof value.generation === "string" ? { generation: value.generation } : {}),
     version: value.version,
     serialized: 1,
     time: value.time as number,
@@ -122,7 +129,8 @@ function validatePayload(value: unknown): CloudSavePayload {
 
 /**
  * 把完成安全校验的客户端 user 收口为 V1 字段白名单。
- * 未列入白名单的字段会被忽略，避免旧客户端或旧文档把废弃字段重新带回云端。
+ * 客户端无法新增/覆盖未知字段；仓储保留已存在的未知资产与模块。
+ * 动物资产原样保存，独立维护工具才允许显式清理。
  */
 function normalizeV1CloudSavePayload(value: CloudSavePayload): CloudSavePayload {
   const user = value.modules.user;
@@ -130,10 +138,11 @@ function normalizeV1CloudSavePayload(value: CloudSavePayload): CloudSavePayload 
   if (isPlainObject(user)) {
     for (const [key, item] of Object.entries(user)) {
       if (!V1_CLOUD_PLAYER_FIELD_SET.has(key)) continue;
-      normalizedUser[key] = key === "animals" ? normalizeCurrentPetRecords(item) : item;
+      normalizedUser[key] = item;
     }
   }
   return {
+    ...(typeof value.generation === "string" ? { generation: value.generation } : {}),
     version: value.version,
     serialized: 1,
     time: value.time,

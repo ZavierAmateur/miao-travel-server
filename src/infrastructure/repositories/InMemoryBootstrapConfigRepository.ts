@@ -8,6 +8,12 @@ export class InMemoryBootstrapConfigRepository implements BootstrapConfigReposit
     return Promise.resolve(this.config);
   }
 
+  compareAndSet(expectedRevision: number, config: BootstrapConfigRecord): Promise<boolean> {
+    if ((this.config?.revision ?? 0) !== expectedRevision) return Promise.resolve(false);
+    this.config = config;
+    return Promise.resolve(true);
+  }
+
   save(config: BootstrapConfigRecord): Promise<void> {
     this.config = config;
     return Promise.resolve();

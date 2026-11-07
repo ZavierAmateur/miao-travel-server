@@ -1,3 +1,4 @@
+import {stableStringify} from "../src/domain/save/CloudSaveValidation.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/app.js";
@@ -83,7 +84,7 @@ describe("管理端玩家查询 API", () => {
     const response = await app!.inject({ method: "GET", url: "/admin/v1/players/player-1", headers: { cookie } });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ data: {
-      id: "player-1", profile: { nickName: "旅行猫" }, save: { revision: 2, sizeBytes: 144 },
+      id: "player-1", profile: { nickName: "旅行猫" }, save: { revision: 2, sizeBytes: Buffer.byteLength(stableStringify({version:"1",serialized:1,time:2400,modules:{user:{level:9,gold:100}}})) },
     } });
     expect(response.body).not.toContain("secret-open-id");
     expect(response.body).not.toContain("modules");

@@ -37,3 +37,27 @@ describe("BootstrapConfigService", () => {
     await expect(new BootstrapConfigService(repository).get()).rejects.toThrow("cloudSaveEnabled");
   });
 });
+
+// 客户端发行规则不按体验版/正式版分叉，老文档无 latest 字段仍可读取。
+describe("统一客户端版本规则", () => {
+  it("默认兼容老文档，并将最新版本加入响应和ETag", async () => {
+    const repo = new InMemoryBootstrapConfigRepository({ revision: 8, maintenanceEnabled: false,
+      maintenanceMessage: "", minimumClientVersion: "1.2.0", cloudSaveEnabled: true,
+      updatedAt: 1, updatedBy: "test" });
+    const service = new BootstrapConfigService(repo);
+    const old = await service.get();
+    expect(old.data).toHaveProperty("latestClientVersion", "");
+    await repo.save({ ...(await repo.find())!, latestClientVersion: "1.3.0" });
+    const next = await service.get();
+    expect(next.data).toHaveProperty("latestClientVersion", "1.3.0");
+    expect(next.etag).not.toBe(old.etag);
+  });
+  it("拒绝非法版本及最低高于最新的发布规则", async () => {
+    const { validateBootstrapConfigRecord, DEFAULT_BOOTSTRAP_CONFIG } = await import("../src/domain/config/BootstrapConfig.js");
+    for (const value of [
+      { minimumClientVersion: "1.2.bad" },
+      { latestClientVersion: "1.3.0-beta" },
+      { minimumClientVersion: "1.4.0", latestClientVersion: "1.3.0" },
+    ]) expect(() => validateBootstrapConfigRecord({ ...DEFAULT_BOOTSTRAP_CONFIG, ...value })).toThrow(/版本|Version/);
+  });
+});

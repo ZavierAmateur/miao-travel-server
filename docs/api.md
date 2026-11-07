@@ -108,6 +108,7 @@
     "message": ""
   },
   "minimumClientVersion": "",
+  "latestClientVersion": "",
   "features": {
     "cloudSaveEnabled": true
   },
@@ -478,3 +479,12 @@ todayAdReliveCount
 | 401 | `AUTH_REQUIRED` | 未携带 Bearer token |
 | 401 | `SESSION_INVALID` | token 无效或已撤销 |
 | 401 | `SESSION_EXPIRED` | token 已过期 |
+
+## 管理端项目设置：版本控制
+
+- `GET /admin/v1/project-settings/version-control`：管理员Cookie会话，需 `config:read`，返回 `revision/latestClientVersion/minimumClientVersion/updatedAt/updatedBy`，不缓存。
+- `PUT /admin/v1/project-settings/version-control`：需 `config:publish`；JSON参数为 `expectedRevision`（读取时获得的revision）、`latestClientVersion`、`minimumClientVersion`，只接收这三个字段。
+- 三段数字版本或空字符串；最低版本不得高于最新版本。成功自动递增revision，保留维护和云存档字段，记录 `project.version.update` 审计。未改变版本值时不重复写入。
+- 旧revision或并发写入返回409 `PROJECT_SETTINGS_CONFLICT`；非法版本/额外字段400，未登录401，无发布权限403；读取及保存响应 `Cache-Control: no-store`。
+- 若配置已写入而审计失败，503 `PROJECT_SETTINGS_AUDIT_FAILED` 明确说明“设置已保存，请重新加载确认”，不把已生效的规则误报为未修改。
+- 公共 `/v1/bootstrap-config` 读取相同文档，玩家在后续冷启动使用更新规则。

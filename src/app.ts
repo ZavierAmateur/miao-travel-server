@@ -1,3 +1,5 @@
+import { AdminProjectSettingsError, type AdminProjectSettingsService, type VersionSettingsInput } from "./domain/config/AdminProjectSettingsService.js";
+import {saveTargetFingerprint} from "./domain/save/SaveTargetFingerprint.js";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import multipart from "@fastify/multipart";
 import type { AppConfig } from "./config/AppConfig.js";
@@ -35,6 +37,7 @@ export interface BuildAppOptions {
   readonly platformLoginService?: PlatformLoginService;
   readonly cloudSaveService?: CloudSaveService;
   readonly bootstrapConfigService?: BootstrapConfigService;
+  readonly adminProjectSettingsService?: AdminProjectSettingsService;
   readonly playerProfileService?: PlayerProfileService;
   readonly adminAuthService?: AdminAuthService;
   readonly adminAuthConfig?: AdminAuthConfig;
@@ -194,6 +197,36 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       reply.header("set-cookie", clearAdminCookie(options.adminAuthConfig!.secureCookie));
       return success(request.id, { loggedOut: true }, now());
     });
+
+    if (options.adminProjectSettingsService) {
+      app.get("/admin/v1/project-settings/version-control", async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        const data = await options.adminProjectSettingsService!.getVersionControl(readAdminCookie(request.headers.cookie));
+        return success(request.id, data, now());
+      });
+      app.put<{ Body: VersionSettingsInput }>("/admin/v1/project-settings/version-control", {
+        bodyLimit: 4 * 1024,
+        preValidation: (request, _reply, done) => {
+          if (request.body && Object.keys(request.body).some(key => !["expectedRevision", "latestClientVersion", "minimumClientVersion"].includes(key))) {
+            done(new AdminProjectSettingsError("INVALID_VERSION_SETTINGS", "只能修改最新版本和最低可用版本", 400));
+            return;
+          }
+          done();
+        },
+        schema: { body: { type: "object", additionalProperties: false,
+          required: ["expectedRevision", "latestClientVersion", "minimumClientVersion"], properties: {
+            expectedRevision: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER - 1 },
+            latestClientVersion: { type: "string", maxLength: 64 },
+            minimumClientVersion: { type: "string", maxLength: 64 },
+          },
+        } },
+      }, async (request, reply) => {
+        reply.header("cache-control", "no-store");
+        const data = await options.adminProjectSettingsService!.updateVersionControl(
+          readAdminCookie(request.headers.cookie), request.body, { requestId: request.id, ip: request.ip });
+        return success(request.id, data, now());
+      });
+    }
 
     if (options.adminPlayerService) {
       app.get<{
@@ -490,6 +523,8 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       environment: options.config.environment,
       platform: options.config.platform,
       persistence: options.config.persistenceDriver,
+      ...(options.cloudSaveService?.progressVersion ? { progressVersion: options.cloudSaveService.progressVersion } : {}),
+      ...(options.cloudSaveService?.saveGeneration ? { saveGeneration: options.cloudSaveService.saveGeneration, saveTarget: saveTargetFingerprint(options.config) } : {}),
     }, now());
   });
 
@@ -666,6 +701,10 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       await respondWithError(request, reply, {
         statusCode: error.statusCode, code: error.code, msg: error.message,
       }, error.name);
+      return;
+    }
+    if (error instanceof AdminProjectSettingsError) {
+      await respondWithError(request, reply, { statusCode: error.statusCode, code: error.code, msg: error.message }, error.name);
       return;
     }
     if (error instanceof AdminPlayerError) {

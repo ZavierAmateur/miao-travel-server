@@ -8,7 +8,9 @@ import type { CloudBaseDatabase } from "../src/infrastructure/persistence/CloudB
 import { PersistenceDriver, assertPersistenceReady, loadConfig } from "../src/config/AppConfig.js";
 import { isMissingCollection, isMissingDocument } from "./cloudbase-probe-errors.js";
 
-if (process.env.BOOTSTRAP_CONFIG_CONFIRM !== "PUBLISH") {
+const dryRun = process.argv.includes("--dry-run");
+if (process.argv.slice(2).some(argument => argument !== "--dry-run")) throw new Error("只支持 --dry-run 参数");
+if (!dryRun && process.env.BOOTSTRAP_CONFIG_CONFIRM !== "PUBLISH") {
   throw new Error("发布远程配置前必须设置 BOOTSTRAP_CONFIG_CONFIRM=PUBLISH");
 }
 
@@ -28,7 +30,7 @@ const database = app.database({
   instance: appConfig.cloudbaseDatabaseInstance,
   database: appConfig.cloudDatabaseName,
 }) as CloudBaseDatabase;
-await ensureCollection(database, "remote_configs");
+if (!dryRun) await ensureCollection(database, "remote_configs");
 
 const repository = new CloudBaseBootstrapConfigRepository(database.collection("remote_configs"));
 const current = await repository.find() ?? DEFAULT_BOOTSTRAP_CONFIG;
@@ -37,19 +39,23 @@ const next = validateBootstrapConfigRecord({
   maintenanceEnabled: readBoolean("BOOTSTRAP_MAINTENANCE_ENABLED", current.maintenanceEnabled),
   maintenanceMessage: process.env.BOOTSTRAP_MAINTENANCE_MESSAGE ?? current.maintenanceMessage,
   minimumClientVersion: process.env.BOOTSTRAP_MINIMUM_CLIENT_VERSION ?? current.minimumClientVersion,
+  latestClientVersion: process.env.BOOTSTRAP_LATEST_CLIENT_VERSION ?? current.latestClientVersion ?? "",
   cloudSaveEnabled: readBoolean("BOOTSTRAP_CLOUD_SAVE_ENABLED", current.cloudSaveEnabled),
   updatedAt: Date.now(),
   updatedBy: process.env.BOOTSTRAP_UPDATED_BY?.trim() || "manual-cli",
 });
-await repository.save(next);
+if (!dryRun && !await repository.compareAndSet(current.revision, next)) {
+  throw new Error("启动配置已被修改，请重新预览后再发布");
+}
 
 process.stdout.write(`${JSON.stringify({
-  status: "published",
+  status: dryRun ? "dry-run" : "published",
   platform: appConfig.platform,
   environment: appConfig.environment,
   revision: next.revision,
   maintenanceEnabled: next.maintenanceEnabled,
   minimumClientVersion: next.minimumClientVersion,
+  latestClientVersion: next.latestClientVersion,
   cloudSaveEnabled: next.cloudSaveEnabled,
   updatedAt: next.updatedAt,
   updatedBy: next.updatedBy,

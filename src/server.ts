@@ -1,3 +1,5 @@
+import { AdminProjectSettingsService } from "./domain/config/AdminProjectSettingsService.js";
+import { CAMPAIGN_SAVE_POLICY } from "./domain/save/CampaignSavePolicy.js";
 import { buildApp } from "./app.js";
 import { assertPersistenceReady, loadConfig } from "./config/AppConfig.js";
 import { PlatformLoginService } from "./domain/auth/PlatformLoginService.js";
@@ -28,6 +30,8 @@ const platformLoginService = new PlatformLoginService({
   sessions: persistence.sessions,
 });
 const levelLeaderboardProjector = new LevelLeaderboardProjector({
+  requiredGeneration: CAMPAIGN_SAVE_POLICY.generation,
+  requiredProgressVersion: CAMPAIGN_SAVE_POLICY.progressVersion,
   leaderboard: persistence.levelLeaderboard,
   players: persistence.players,
   profiles: persistence.profiles,
@@ -39,6 +43,9 @@ const leaderboardSync = new LeaderboardSyncService({
   onError: failure => app.log.warn(failure, "排行榜同步失败，保留待同步标记"),
 });
 const cloudSaveService = new CloudSaveService({
+  requiredGeneration: CAMPAIGN_SAVE_POLICY.generation,
+  requiredProgressVersion: CAMPAIGN_SAVE_POLICY.progressVersion,
+  firstPlayableLevel: CAMPAIGN_SAVE_POLICY.firstPlayableLevel,
   sessions: persistence.sessions,
   saves: persistence.saves,
   players: persistence.players,
@@ -58,6 +65,9 @@ const adminAuthService = adminAuthConfig.enabled
       sessions: persistence.adminSessions,
       audits: persistence.adminAudits,
     })
+  : undefined;
+const adminProjectSettingsService = adminAuthService
+  ? new AdminProjectSettingsService({ auth: adminAuthService, repository: persistence.bootstrapConfigs, audits: persistence.adminAudits })
   : undefined;
 const adminLeaderboardService = adminAuthService
   ? new AdminLeaderboardService({ auth: adminAuthService, leaderboard: persistence.levelLeaderboard })
@@ -106,6 +116,7 @@ const app = buildApp({
   playerProfileService,
   announcementService,
   ...(adminAuthService && adminErrorLogService ? { adminAuthService, adminAuthConfig, adminErrorLogService } : {}),
+  ...(adminProjectSettingsService ? { adminProjectSettingsService } : {}),
   ...(adminPlayerService ? { adminPlayerService } : {}),
   ...(adminLeaderboardService ? { adminLeaderboardService } : {}),
   ...(adminFileService ? { adminFileService } : {}),

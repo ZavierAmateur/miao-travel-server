@@ -23,7 +23,9 @@
     "profile:check:wechat": "node --env-file=.env.wechat.local --import tsx scripts/check-player-profile.ts",
     "error-log:check:wechat": "node --env-file=.env.wechat.local --import tsx scripts/check-admin-error-logs.ts",
     "leaderboard:backfill:wechat": "node --env-file=.env.wechat.local --import tsx scripts/backfill-level-leaderboard.ts",
-    "bootstrap:publish:wechat": "node --env-file=.env.wechat.local --import tsx scripts/publish-bootstrap-config.ts"
+    "bootstrap:publish:wechat": "node --env-file=.env.wechat.local --import tsx scripts/publish-bootstrap-config.ts",
+    "save:reset-progress:wechat": "node --env-file=.env.wechat.local --import tsx scripts/reset-campaign-progress.ts",
+    "save:reset-development:wechat": "node --env-file=.env.wechat.local --import tsx scripts/reset-development-game-saves.ts"
   },
   "dependencies": {
     "@cloudbase/js-sdk": "^3.9.4",

@@ -51,6 +51,7 @@ describe("GET /v1/bootstrap-config", () => {
         configRevision: 0,
         maintenance: { enabled: false, message: "" },
         minimumClientVersion: "",
+        latestClientVersion: "",
         features: { cloudSaveEnabled: true },
         cacheTtlSeconds: 300,
       },
@@ -80,6 +81,7 @@ describe("GET /v1/bootstrap-config", () => {
       configRevision: 7,
       maintenance: { enabled: true, message: "云服务维护中，本地游戏不受影响" },
       minimumClientVersion: "3.4.2",
+      latestClientVersion: "",
       features: { cloudSaveEnabled: false },
       cacheTtlSeconds: 300,
     });

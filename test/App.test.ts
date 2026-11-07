@@ -1,3 +1,5 @@
+import {saveTargetFingerprint} from "../src/domain/save/SaveTargetFingerprint.js";
+import type {CloudSaveService} from "../src/domain/save/CloudSaveService.js";
 import { afterEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/app.js";
@@ -63,4 +65,12 @@ describe("HTTP app", () => {
     });
     expect(response.body).toMatch(/"requestId":"[^"]+"/);
   });
+});
+
+it("清档健康检查暴露同一持久化目标指纹，环境/实例/数据库变更均不能混用",async()=>{
+ const target={...config,cloudbaseEnvId:"env-a",cloudbaseDatabaseInstance:"instance-a",cloudDatabaseName:"game"};
+ const app=buildApp({config:target,cloudSaveService:{saveGeneration:"mixed99-20261105",progressVersion:"rhythm80-20261106"} as CloudSaveService});
+ try{const response=await app.inject({method:"GET",url:"/health"});expect(response.json<{data:{saveGeneration:string;saveTarget:string}}>().data).toMatchObject({saveGeneration:"mixed99-20261105",progressVersion:"rhythm80-20261106",saveTarget:saveTargetFingerprint(target)});expect(response.body).not.toContain("test-secret");}
+ finally{await app.close();}
+ for(const key of ["cloudbaseEnvId","cloudbaseDatabaseInstance","cloudDatabaseName"] as const)expect(saveTargetFingerprint({...target,[key]:"other"})).not.toBe(saveTargetFingerprint(target));
 });
